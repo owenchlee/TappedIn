@@ -30,12 +30,12 @@ export function AddPostingForm() {
           setError(null);
           const formData = new FormData(e.currentTarget);
           startTransition(async () => {
-            try {
-              await createPosting(formData);
+            const result = await createPosting(formData);
+            if (result.ok) {
               formRef.current?.reset();
               setExpanded(false);
-            } catch (err) {
-              setError(err instanceof Error ? err.message : "Failed to add posting");
+            } else {
+              setError(result.error);
             }
           });
         }}

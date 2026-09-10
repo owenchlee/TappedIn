@@ -1,0 +1,30 @@
+{
+  "version": 1,
+  "kind": "club",
+  "items": [
+    {
+      "slug": "computer-science-club",
+      "name": "Computer Science Club (CSC)",
+      "url": "https://csclub.uwaterloo.ca/",
+      "description": "UW's student computing community — academic, career, and social events for computing students. Office in MC 3036/3037.",
+      "tags": ["cs", "social", "academic"],
+      "sortOrder": 10
+    },
+    {
+      "slug": "women-in-computer-science",
+      "name": "Women in Computer Science (WiCS)",
+      "url": "https://uwaterloo.ca/women-in-computer-science/",
+      "description": "Promotes gender equity in computing; runs WiCS Con, mentorship, and networking events.",
+      "tags": ["cs", "community"],
+      "sortOrder": 20
+    },
+    {
+      "slug": "data-science-club",
+      "name": "Waterloo Data Science Club",
+      "url": "https://www.uwdatascience.ca/",
+      "description": "Workshops on data science and ML topics, project collaboration, and interview-prep sessions.",
+      "tags": ["data-science", "ml"],
+      "sortOrder": 30
+    }
+  ]
+}

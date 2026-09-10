@@ -1,0 +1,29 @@
+{
+  "version": 1,
+  "sources": [
+    {
+      "key": "robinhood",
+      "name": "Robinhood",
+      "careerUrl": "https://careers.robinhood.com/",
+      "adapter": "greenhouse",
+      "enabled": true,
+      "config": { "boardToken": "robinhood" },
+      "match": {
+        "includeTitle": "(intern|co-?op|university|new grad)",
+        "excludeTitle": "(senior|staff|principal|director|lead\\b)"
+      }
+    },
+    {
+      "key": "palantir",
+      "name": "Palantir",
+      "careerUrl": "https://www.palantir.com/careers/",
+      "adapter": "lever",
+      "enabled": true,
+      "config": { "company": "palantir" },
+      "match": {
+        "includeTitle": "(intern|co-?op|university|new grad)",
+        "includeLocation": "(canada|remote|toronto|ottawa|waterloo|new york|washington)"
+      }
+    }
+  ]
+}

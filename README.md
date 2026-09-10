@@ -42,6 +42,9 @@ updating the existing one. Fields here are re-synced from the file on every serv
 edit *in the app itself* (application status, notes, deadline, last-checked date) is a separate
 database column that the seed step never overwrites. Removing an item from the JSON doesn't delete it
 from the app — it just gets flagged "No longer in seed list" in case you'd saved/tracked it.
+Moving an existing `slug` from `data/clubs.json` to `data/design-teams.json` (or vice versa) doesn't
+move it between tabs — the row's `kind` is only set when it's first created. Delete and re-add it
+under a new slug instead if you need to recategorize something.
 
 There is **no automatic fetching** for these two tabs — that's intentional (see the original brief:
 there's no reliable public API for "has this club's application opened"). Use the **Check now** button

@@ -1,14 +1,32 @@
 import { prisma } from "@/lib/db";
 import { shouldMarkDisappeared, type DiffResult } from "@/lib/sources/diff";
 
+export type ExistingPostingMeta = { disappearedAt: Date | null; dismissedAt: Date | null };
+
 export async function applyDiff(params: {
   sourceKey: string;
   companyName: string;
   diff: DiffResult;
-  existingDisappearedAt: Map<string, Date | null>;
+  existingMeta: Map<string, ExistingPostingMeta>;
 }): Promise<{ created: number; touched: number; missed: number }> {
-  const { sourceKey, companyName, diff, existingDisappearedAt } = params;
+  const { sourceKey, companyName, diff, existingMeta } = params;
   const now = new Date();
+
+  // A touched posting was still present in the fetch. If it had been auto-flagged as possibly
+  // closed (disappearedAt set) and the user never confirmed that closure (dismissedAt null),
+  // reappearing should also restore status: "open" — otherwise it stays permanently "closed"
+  // with no "possibly closed" banner left to resolve it from. A posting the user explicitly
+  // confirmed closed (dismissedAt set) keeps that judgment even if the source lists it again.
+  const touchReopen: string[] = [];
+  const touchKeepStatus: string[] = [];
+  for (const t of diff.toTouch) {
+    const meta = existingMeta.get(t.id);
+    if (meta?.disappearedAt != null && meta.dismissedAt == null) {
+      touchReopen.push(t.id);
+    } else {
+      touchKeepStatus.push(t.id);
+    }
+  }
 
   const ops = [
     ...diff.toCreate.map((posting) =>
@@ -28,16 +46,24 @@ export async function applyDiff(params: {
         },
       }),
     ),
-    ...(diff.toTouch.length > 0
+    ...(touchReopen.length > 0
       ? [
           prisma.coopPosting.updateMany({
-            where: { id: { in: diff.toTouch.map((t) => t.id) } },
+            where: { id: { in: touchReopen } },
+            data: { lastSeenAt: now, missCount: 0, disappearedAt: null, status: "open" },
+          }),
+        ]
+      : []),
+    ...(touchKeepStatus.length > 0
+      ? [
+          prisma.coopPosting.updateMany({
+            where: { id: { in: touchKeepStatus } },
             data: { lastSeenAt: now, missCount: 0, disappearedAt: null },
           }),
         ]
       : []),
     ...diff.toMiss.map((m) => {
-      const alreadyFlagged = existingDisappearedAt.get(m.id) != null;
+      const alreadyFlagged = existingMeta.get(m.id)?.disappearedAt != null;
       const nowFlagged = shouldMarkDisappeared(m.missCount);
       return prisma.coopPosting.update({
         where: { id: m.id },

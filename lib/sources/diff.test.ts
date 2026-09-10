@@ -8,7 +8,7 @@ function posting(title: string, url: string): RawPosting {
 }
 
 function existingFor(title: string, url: string, overrides: Partial<ExistingPosting> = {}): ExistingPosting {
-  return { id: `id-${title}`, externalKey: externalKeyFor(url, title), missCount: 0, ...overrides };
+  return { id: `id-${title}`, externalKey: externalKeyFor(url, title), missCount: 0, disappearedAt: null, ...overrides };
 }
 
 describe("diffPostings", () => {
@@ -109,5 +109,35 @@ describe("diffPostings", () => {
   it("dedupes duplicate postings within a single fetch", () => {
     const result = diffPostings([], [posting("Intern A", "https://x.com/a"), posting("Intern A", "https://x.com/a?utm=1")]);
     expect(result.toCreate).toHaveLength(1);
+  });
+
+  it("ignores already-disappeared postings when computing the sanity-guard denominator", () => {
+    // 20 historically-seen postings, but 15 of them are already closed/disappeared — only 5 are
+    // "active". Fetching back all 5 active ones (100% of active) must NOT trip the sanity guard,
+    // even though 5 is far below 20 (25%, which would have wrongly tripped it pre-fix).
+    const closed = Array.from({ length: 15 }, (_, i) =>
+      existingFor(`Closed ${i}`, `https://x.com/closed${i}`, { disappearedAt: new Date("2026-01-01") }),
+    );
+    const active = Array.from({ length: 5 }, (_, i) => existingFor(`Active ${i}`, `https://x.com/active${i}`));
+    const existing = [...closed, ...active];
+    const fetched = active.map((e) => posting(e.id.replace("id-", ""), `https://x.com/${e.id.replace("id-Active ", "active")}`));
+
+    const result = diffPostings(existing, fetched);
+    expect(result.ok).toBe(true);
+    expect(result.toTouch).toHaveLength(5);
+    expect(result.toMiss).toHaveLength(0); // no active postings went missing, so no misses expected either way
+  });
+
+  it("does not treat zero fetched postings as a failed run when only disappeared postings exist historically", () => {
+    const existing = [existingFor("Old", "https://x.com/old", { disappearedAt: new Date("2026-01-01") })];
+    const result = diffPostings(existing, []);
+    expect(result.ok).toBe(true);
+  });
+
+  it("matches a reappearing already-disappeared posting as a touch, not a duplicate create", () => {
+    const existing = [existingFor("Intern A", "https://x.com/a", { disappearedAt: new Date("2026-01-01"), missCount: 3 })];
+    const result = diffPostings(existing, [posting("Intern A", "https://x.com/a")]);
+    expect(result.toCreate).toHaveLength(0);
+    expect(result.toTouch).toEqual([{ id: "id-Intern A" }]);
   });
 });

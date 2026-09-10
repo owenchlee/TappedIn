@@ -1,6 +1,6 @@
 "use client";
 
-import { useTransition } from "react";
+import { useState, useTransition } from "react";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
@@ -8,6 +8,7 @@ import { DeadlineBadge } from "@/components/DeadlineBadge";
 import { StatusPill } from "@/components/StatusPill";
 import { SaveButton } from "@/components/SaveButton";
 import { NotesEditor } from "@/components/NotesEditor";
+import { EditPostingForm } from "@/components/EditPostingForm";
 import { urgencyOf } from "@/lib/deadline";
 import { relativeTime, hostnameFromUrl } from "@/lib/format";
 import { COOP_STATUSES } from "@/lib/types";
@@ -24,7 +25,16 @@ export function PostingCard({
   isPossiblyClosed: boolean;
 }) {
   const [isPending, startTransition] = useTransition();
+  const [editing, setEditing] = useState(false);
   const urgency = urgencyOf(posting.deadline);
+
+  if (editing) {
+    return (
+      <Card urgency={urgency}>
+        <EditPostingForm posting={posting} onDone={() => setEditing(false)} />
+      </Card>
+    );
+  }
 
   return (
     <Card urgency={urgency} className="space-y-2">
@@ -79,7 +89,10 @@ export function PostingCard({
       <NotesEditor kind="coop" id={posting.id} initialNotes={posting.notes} />
 
       {posting.origin === "manual" && (
-        <div className="flex justify-end">
+        <div className="flex justify-end gap-2">
+          <Button size="sm" variant="ghost" onClick={() => setEditing(true)}>
+            Edit
+          </Button>
           <Button
             size="sm"
             variant="ghost"

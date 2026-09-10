@@ -32,6 +32,12 @@ function calendarDateStringToUtcMidnightMs(dateStr: string): number {
   return Date.UTC(y, m - 1, d);
 }
 
+/** Toronto calendar year, not the runtime's local year — matters near a New Year boundary when the
+ * server/browser timezone differs from America/Toronto. */
+function calendarYear(date: Date): number {
+  return Number(toCalendarDateString(date).slice(0, 4));
+}
+
 /** Whole calendar-day difference (deadline - now) in America/Toronto, DST-safe. */
 export function daysUntil(deadline: Date, now: Date = new Date()): number {
   const deadlineMs = calendarDateStringToUtcMidnightMs(toCalendarDateString(deadline));
@@ -61,12 +67,12 @@ export function deadlineLabel(deadline: Date, now: Date = new Date()): string {
   if (days === -1) return "Overdue by 1 day";
   if (days < -1) return `Overdue by ${-days} days`;
   if (days <= 30) return `Due in ${days} days`;
-  const formatter = deadline.getFullYear() === now.getFullYear() ? shortDateFormatter : longDateFormatter;
+  const formatter = calendarYear(deadline) === calendarYear(now) ? shortDateFormatter : longDateFormatter;
   return `Due ${formatter.format(deadline)}`;
 }
 
 export function formatDate(date: Date, now: Date = new Date()): string {
-  const formatter = date.getFullYear() === now.getFullYear() ? shortDateFormatter : longDateFormatter;
+  const formatter = calendarYear(date) === calendarYear(now) ? shortDateFormatter : longDateFormatter;
   return formatter.format(date);
 }
 

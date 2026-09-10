@@ -8,7 +8,12 @@ export async function POST(req: Request, { params }: { params: Promise<{ key: st
     return Response.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const { key } = await params;
-  const summary = await runSourceByKey(key);
-  return Response.json({ summary });
+  try {
+    const { key } = await params;
+    const summary = await runSourceByKey(key);
+    return Response.json({ summary });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return Response.json({ error: message }, { status: 500 });
+  }
 }

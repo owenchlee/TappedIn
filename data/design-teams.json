@@ -1,0 +1,46 @@
+{
+  "version": 1,
+  "kind": "design_team",
+  "items": [
+    {
+      "slug": "wat-ai",
+      "name": "WAT.ai",
+      "url": "https://watai.ca/",
+      "description": "Student-run AI design team at Waterloo; project-based teams spanning ML, research, and applied AI.",
+      "tags": ["ai", "ml", "research"],
+      "sortOrder": 10
+    },
+    {
+      "slug": "uw-blueprint",
+      "name": "UW Blueprint",
+      "url": "https://uwblueprint.org/",
+      "description": "Builds free software for nonprofits, staffed by UW students in engineering and design roles.",
+      "tags": ["software", "nonprofit", "design"],
+      "sortOrder": 20
+    },
+    {
+      "slug": "waterloop",
+      "name": "Waterloop",
+      "url": "https://uwaterloo.ca/sedra-student-design-centre/catalogs/student-design-teams/waterloop",
+      "description": "Hyperloop pod design team, built from students across all six faculties.",
+      "tags": ["hardware", "engineering"],
+      "sortOrder": 30
+    },
+    {
+      "slug": "midnight-sun-solar-car",
+      "name": "Midnight Sun Solar Car Team",
+      "url": "https://www.uwmidsun.com/",
+      "description": "Designs and builds a solar-powered race car for international competitions.",
+      "tags": ["hardware", "automotive"],
+      "sortOrder": 40
+    },
+    {
+      "slug": "waterloo-rocketry",
+      "name": "Waterloo Rocketry",
+      "url": "https://uwaterloo.ca/engineering/waterloo-rocketry",
+      "description": "Designs and launches high-power rockets, competing at Spaceport America Cup.",
+      "tags": ["aerospace", "hardware"],
+      "sortOrder": 50
+    }
+  ]
+}

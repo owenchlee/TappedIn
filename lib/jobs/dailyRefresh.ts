@@ -4,12 +4,28 @@ import { createFetchCtx } from "@/lib/sources/fetchSource";
 import { getAdapter } from "@/lib/sources/adapters";
 import { applyMatch } from "@/lib/sources/filter";
 import { diffPostings } from "@/lib/sources/diff";
-import { applyDiff } from "@/lib/sources/apply";
+import { applyDiff, type ExistingPostingMeta } from "@/lib/sources/apply";
 import type { LoadedSource } from "@/lib/sources/types";
 
 export const JOB_KEY = "daily-refresh";
 
-let isRunning = false;
+// globalThis-scoped (not a module-level `let`) because instrumentation.ts, route handlers, and
+// server actions can end up as separate bundled module instances in the same Node process — a
+// plain module-level flag would not be shared between them, defeating the re-entrancy guard.
+const globalForRefresh = globalThis as unknown as { coophubRefreshRunning?: boolean };
+
+export function isRefreshRunning(): boolean {
+  return globalForRefresh.coophubRefreshRunning === true;
+}
+
+async function withRefreshLock<T>(fn: () => Promise<T>): Promise<T> {
+  globalForRefresh.coophubRefreshRunning = true;
+  try {
+    return await fn();
+  } finally {
+    globalForRefresh.coophubRefreshRunning = false;
+  }
+}
 
 export type SourceRunSummary = {
   sourceKey: string;
@@ -31,13 +47,13 @@ async function runOneSource(source: LoadedSource): Promise<SourceRunSummary> {
 
     const existingRows = await prisma.coopPosting.findMany({
       where: { sourceKey: source.key, origin: "fetched" },
-      select: { id: true, externalKey: true, missCount: true, disappearedAt: true },
+      select: { id: true, externalKey: true, missCount: true, disappearedAt: true, dismissedAt: true },
     });
 
     const diff = diffPostings(
       existingRows
         .filter((r): r is typeof r & { externalKey: string } => r.externalKey != null)
-        .map((r) => ({ id: r.id, externalKey: r.externalKey, missCount: r.missCount })),
+        .map((r) => ({ id: r.id, externalKey: r.externalKey, missCount: r.missCount, disappearedAt: r.disappearedAt })),
       filtered,
     );
 
@@ -45,12 +61,14 @@ async function runOneSource(source: LoadedSource): Promise<SourceRunSummary> {
       throw new Error(`Diff rejected the run: ${diff.reason ?? "unknown reason"}`);
     }
 
-    const existingDisappearedAt = new Map(existingRows.map((r) => [r.id, r.disappearedAt]));
+    const existingMeta = new Map<string, ExistingPostingMeta>(
+      existingRows.map((r) => [r.id, { disappearedAt: r.disappearedAt, dismissedAt: r.dismissedAt }]),
+    );
     const result = await applyDiff({
       sourceKey: source.key,
       companyName: source.name,
       diff,
-      existingDisappearedAt,
+      existingMeta,
     });
 
     const now = new Date();
@@ -78,12 +96,11 @@ async function runOneSource(source: LoadedSource): Promise<SourceRunSummary> {
 }
 
 export async function runDailyRefresh(): Promise<SourceRunSummary[]> {
-  if (isRunning) {
+  if (isRefreshRunning()) {
     return [];
   }
-  isRunning = true;
 
-  try {
+  return withRefreshLock(async () => {
     const sources = await listEnabledSources();
     const summaries: SourceRunSummary[] = [];
 
@@ -102,13 +119,24 @@ export async function runDailyRefresh(): Promise<SourceRunSummary[]> {
     });
 
     return summaries;
-  } finally {
-    isRunning = false;
-  }
+  });
 }
 
 /** Runs a single source on demand (used by the /sources dashboard's "Run now" button), regardless of its enabled flag. */
 export async function runSourceByKey(key: string): Promise<SourceRunSummary> {
-  const row = await prisma.companySource.findUniqueOrThrow({ where: { key } });
-  return runOneSource(loadedSourceFromRow(row));
+  if (isRefreshRunning()) {
+    return {
+      sourceKey: key,
+      ok: false,
+      created: 0,
+      touched: 0,
+      missed: 0,
+      error: "A refresh is already running — try again shortly.",
+    };
+  }
+
+  return withRefreshLock(async () => {
+    const row = await prisma.companySource.findUniqueOrThrow({ where: { key } });
+    return runOneSource(loadedSourceFromRow(row));
+  });
 }

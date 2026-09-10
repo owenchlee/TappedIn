@@ -1,6 +1,7 @@
 "use client";
 
 import { useOptimistic, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { clsx } from "clsx";
 import { toggleSave } from "@/actions/saved";
 import type { SavedCategory } from "@/lib/types";
@@ -14,6 +15,7 @@ export function SaveButton({
   itemId: string;
   initialSaved: boolean;
 }) {
+  const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [optimisticSaved, setOptimisticSaved] = useOptimistic(initialSaved);
 
@@ -26,7 +28,14 @@ export function SaveButton({
       onClick={() => {
         startTransition(async () => {
           setOptimisticSaved(!optimisticSaved);
-          await toggleSave(category, itemId);
+          try {
+            await toggleSave(category, itemId);
+          } catch (err) {
+            console.error("Failed to toggle save:", err);
+            // The optimistic value is now wrong with no revalidation to correct it — force a
+            // refresh so the button falls back to the real, server-confirmed saved state.
+            router.refresh();
+          }
         });
       }}
       className={clsx(
