@@ -1,0 +1,127 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../lib/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model CoopPosting {
+  id           String    @id @default(cuid())
+  company      String
+  role         String
+  url          String
+  location     String?
+  deadline     DateTime?
+  status       String    @default("open") // open | closed | unknown
+  notes        String    @default("")
+
+  origin       String    @default("manual") // manual | fetched
+  sourceKey    String?
+  externalKey  String?
+
+  firstSeenAt    DateTime  @default(now())
+  lastSeenAt     DateTime?
+  missCount      Int       @default(0)
+  disappearedAt  DateTime?
+  dismissedAt    DateTime?
+
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  saved  SavedItem?
+  source CompanySource? @relation(fields: [sourceKey], references: [key], onDelete: SetNull)
+
+  @@unique([sourceKey, externalKey])
+  @@index([status])
+  @@index([deadline])
+  @@index([firstSeenAt])
+}
+
+model Organization {
+  id                String    @id @default(cuid())
+  kind              String // design_team | club
+  slug              String    @unique
+  name              String
+  url               String
+  applyUrl          String?
+  description       String    @default("")
+  tagsJson          String    @default("[]")
+  applicationStatus String    @default("unknown") // open | closed | rolling | unknown
+  deadline          DateTime?
+  notes             String    @default("")
+  lastCheckedAt     DateTime?
+  managed           Boolean   @default(true)
+  sortOrder         Int       @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  saved SavedItem?
+
+  @@index([kind, applicationStatus])
+  @@index([deadline])
+}
+
+model SavedItem {
+  id        String    @id @default(cuid())
+  category  String // coop | design_team | club
+  status    String    @default("interested") // interested | applied | interview | rejected | accepted
+  pinned    Boolean   @default(true)
+  appliedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  coopPostingId String?      @unique
+  coopPosting   CoopPosting? @relation(fields: [coopPostingId], references: [id], onDelete: Cascade)
+
+  organizationId String?       @unique
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([status])
+}
+
+model CompanySource {
+  key      String  @id
+  name     String
+  careerUrl String
+  adapter  String // greenhouse | lever | generic-css | generic-json
+  configJson String @default("{}")
+  enabled  Boolean @default(true)
+
+  lastRunAt        DateTime?
+  lastOkAt         DateTime?
+  lastError        String?
+  lastFetchedCount Int       @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  postings CoopPosting[]
+  runs     SourceRun[]
+}
+
+model SourceRun {
+  id         String    @id @default(cuid())
+  sourceKey  String
+  startedAt  DateTime  @default(now())
+  finishedAt DateTime?
+  ok         Boolean   @default(false)
+  fetched    Int       @default(0)
+  created    Int       @default(0)
+  missed     Int       @default(0)
+  error      String?
+
+  source CompanySource @relation(fields: [sourceKey], references: [key], onDelete: Cascade)
+
+  @@index([sourceKey, startedAt])
+}
+
+model JobState {
+  key       String    @id
+  lastRunAt DateTime?
+  lastOkAt  DateTime?
+  lastError String?
+}
