@@ -1,0 +1,115 @@
+{
+  "version": 1,
+  "kind": "hackathon",
+  "items": [
+    {
+      "slug": "hack-the-north",
+      "name": "Hack the North",
+      "url": "https://hackthenorth.com/",
+      "description": "Canada's biggest hackathon, hosted on UW campus (DC/E7) every September. Home turf — easiest one to get to.",
+      "tags": [
+        "waterloo",
+        "0 km",
+        "in-person",
+        "flagship"
+      ],
+      "sortOrder": 10,
+      "eventStart": "2026-09-18",
+      "eventEnd": "2026-09-20"
+    },
+    {
+      "slug": "terrible-hackathon",
+      "name": "Terrible Hackathon",
+      "url": "https://terriblehack.website/",
+      "description": "Small, joke-friendly hackathon about making deliberately terrible hacks. Started at UW, but now run in Toronto by Creative Code Toronto (2026 was a one-day event at InterAccess).",
+      "tags": [
+        "toronto",
+        "~110 km",
+        "in-person",
+        "casual"
+      ],
+      "sortOrder": 20,
+      "eventStart": "2026-04-26",
+      "eventEnd": "2026-04-26"
+    },
+    {
+      "slug": "hawkhacks",
+      "name": "HawkHacks",
+      "url": "https://hawkhacks.ca/",
+      "description": "Wilfrid Laurier's student hackathon, held right next door in Waterloo.",
+      "tags": [
+        "waterloo",
+        "0 km",
+        "in-person"
+      ],
+      "sortOrder": 30
+    },
+    {
+      "slug": "hack-the-6ix",
+      "name": "Hack the 6ix",
+      "url": "https://hackthe6ix.com/",
+      "description": "Toronto-based hackathon, industry-sponsor heavy. About a 1-1.5hr drive/GO ride from Waterloo.",
+      "tags": [
+        "toronto",
+        "~110 km",
+        "in-person"
+      ],
+      "sortOrder": 40,
+      "eventStart": "2026-07-17",
+      "eventEnd": "2026-07-19"
+    },
+    {
+      "slug": "makeuoft",
+      "name": "MakeUofT",
+      "url": "https://makeuoft.ca/",
+      "description": "University of Toronto's hardware-focused hackathon. Good one if you want to build something physical. 2027 dates TBD — applications open later in the year.",
+      "tags": [
+        "toronto",
+        "~110 km",
+        "in-person",
+        "hardware"
+      ],
+      "sortOrder": 50
+    },
+    {
+      "slug": "cxc",
+      "name": "CxC (UW Data Science Club)",
+      "url": "https://cxc.uwdatascience.ca/",
+      "description": "UW Data Science Club's data science / AI hackathon, usually early February on campus. 2027 dates not announced yet.",
+      "tags": [
+        "waterloo",
+        "0 km",
+        "data-science"
+      ],
+      "sortOrder": 60
+    },
+    {
+      "slug": "deltahacks",
+      "name": "DeltaHacks",
+      "url": "https://deltahacks.com/",
+      "description": "McMaster's flagship hackathon in Hamilton. Under an hour's drive from Waterloo.",
+      "tags": [
+        "hamilton",
+        "~85 km",
+        "in-person"
+      ],
+      "sortOrder": 70,
+      "eventStart": "2027-01-09",
+      "eventEnd": "2027-01-11"
+    },
+    {
+      "slug": "hackwestern",
+      "name": "Hack Western",
+      "url": "https://www.hackwestern.com/",
+      "description": "Western University's hackathon in London. Furthest on this list — still a reasonable ~1.5hr drive.",
+      "tags": [
+        "london",
+        "~110 km",
+        "in-person"
+      ],
+      "sortOrder": 80,
+      "eventStart": "2026-11-20",
+      "eventEnd": "2026-11-22"
+    }
+  ]
+}

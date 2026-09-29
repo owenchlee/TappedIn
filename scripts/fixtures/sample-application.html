@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Software Engineering Intern (Winter 2027) - Northwind Robotics</title>
+<style>
+  body { font-family: system-ui, sans-serif; max-width: 760px; margin: 32px auto; padding: 0 16px; line-height: 1.5; }
+  label { display: block; font-weight: 600; margin-top: 14px; }
+  input[type=text], input[type=email], input[type=tel], input[type=url], select, textarea { width: 100%; padding: 6px; }
+  fieldset { margin-top: 14px; }
+  #status { padding: 8px; background: #eef; margin-top: 16px; }
+</style>
+</head>
+<body>
+<!-- Local test fixture for scripts/autoapply.ts. Shaped like a Greenhouse job page (posting text
+     above, form below). The Submit button records a click so tests can prove it was never pressed. -->
+<main>
+  <h1>Software Engineering Intern, Robot Fleet Tools (Winter 2027 co-op)</h1>
+  <p>Northwind Robotics builds autonomous warehouse robots. Our Fleet Tools team writes the
+  TypeScript and Python services that let operators monitor hundreds of robots in real time.</p>
+  <h2>What you'll do</h2>
+  <ul>
+    <li>Build React and TypeScript dashboards that visualize live robot telemetry</li>
+    <li>Write Python data pipelines that turn sensor logs into metrics</li>
+    <li>Improve API latency and add caching where it matters</li>
+    <li>Write tests and ship to production with code review</li>
+  </ul>
+  <h2>What we're looking for</h2>
+  <ul>
+    <li>Experience with TypeScript, React, and Node.js</li>
+    <li>Python, ideally with some ML or computer vision exposure</li>
+    <li>You measure performance before and after you optimize</li>
+    <li>Kubernetes and Go experience is a plus</li>
+  </ul>
+  <p><strong>A cover letter is required</strong> for this position. Please tell us why Fleet Tools.</p>
+
+  <h2>Apply for this job</h2>
+  <form id="application_form" onsubmit="event.preventDefault(); window.__submitted = true; document.getElementById('status').textContent = 'SUBMITTED';">
+    <label for="first_name">First Name *</label>
+    <input type="text" id="first_name" name="first_name" required>
+    <label for="last_name">Last Name *</label>
+    <input type="text" id="last_name" name="last_name" required>
+    <label for="email">Email *</label>
+    <input type="email" id="email" name="email" required>
+    <label for="phone">Phone</label>
+    <input type="tel" id="phone" name="phone">
+
+    <label for="resume">Resume/CV *</label>
+    <input type="file" id="resume" name="resume" accept=".pdf" required style="display:none">
+    <button type="button" onclick="document.getElementById('resume').click()">Attach</button>
+    <label for="cover_letter">Cover Letter *</label>
+    <input type="file" id="cover_letter" name="cover_letter" accept=".pdf" required style="display:none">
+    <button type="button" onclick="document.getElementById('cover_letter').click()">Attach</button>
+
+    <label for="linkedin">LinkedIn Profile</label>
+    <input type="url" id="linkedin" name="linkedin">
+    <label for="website">Website</label>
+    <input type="url" id="website" name="website">
+    <label for="school">School *</label>
+    <input type="text" id="school" name="school" required>
+    <label for="grad">Expected graduation date</label>
+    <input type="text" id="grad" name="grad">
+
+    <label for="hear">How did you hear about this job?</label>
+    <select id="hear" name="hear">
+      <option value="">Select...</option>
+      <option>LinkedIn</option>
+      <option>Company website</option>
+      <option>Referral</option>
+      <option>Other</option>
+    </select>
+
+    <fieldset>
+      <legend>Are you legally authorized to work in Canada? *</legend>
+      <label><input type="radio" name="auth" value="yes" required> Yes</label>
+      <label><input type="radio" name="auth" value="no"> No</label>
+    </fieldset>
+
+    <label for="term">Which co-op term are you applying for? *</label>
+    <select id="term" name="term" required>
+      <option value="">Select...</option>
+      <option>Winter 2027</option>
+      <option>Summer 2027</option>
+    </select>
+
+    <label for="why">Why are you interested in the Fleet Tools team? *</label>
+    <textarea id="why" name="why" rows="5" required></textarea>
+
+    <label for="perf">Tell us about a time you made something measurably faster.</label>
+    <textarea id="perf" name="perf" rows="5"></textarea>
+
+    <label for="gender">Gender</label>
+    <select id="gender" name="gender">
+      <option value="">Select...</option>
+      <option>Male</option>
+      <option>Female</option>
+      <option>Non-binary</option>
+      <option>I don't wish to answer</option>
+    </select>
+    <label for="veteran">Veteran Status</label>
+    <select id="veteran" name="veteran">
+      <option value="">Select...</option>
+      <option>I am a veteran</option>
+      <option>I am not a veteran</option>
+      <option>I don't wish to answer</option>
+    </select>
+
+    <p><button type="submit" id="submit_app">Submit Application</button></p>
+  </form>
+  <div id="status">not submitted</div>
+</main>
+</body>
+</html>

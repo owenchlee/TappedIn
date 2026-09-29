@@ -1,136 +1,75 @@
 import { prisma } from "@/lib/db";
-import { isNewPosting } from "@/lib/data/coop";
-import { urgencyOf } from "@/lib/deadline";
-import type { SavedCategory } from "@/lib/types";
+import { isOrgApplicable } from "@/lib/data/orgs";
+import { ACTIVE_STAGES } from "@/lib/types";
 
-export type Stats = { openCount: number; savedCount: number; dueSoonCount: number };
+const DAY = 86_400_000;
 
-export async function getStats(): Promise<Stats> {
-  const [postings, orgs, savedCount] = await Promise.all([
-    prisma.coopPosting.findMany({ select: { status: true, deadline: true } }),
-    prisma.organization.findMany({ select: { applicationStatus: true, deadline: true } }),
-    prisma.savedItem.count(),
+export type TodayStats = {
+  active: number;
+  applied30d: number;
+  interviewsAhead: number;
+  offers: number;
+  responseRate: number | null;
+};
+
+export async function getTodayStats(now: Date = new Date()): Promise<TodayStats> {
+  const [active, applied30d, interviewsAhead, offers, appliedEver, heardBack] = await Promise.all([
+    prisma.savedItem.count({ where: { status: { in: [...ACTIVE_STAGES].filter((s) => s !== "interested") } } }),
+    prisma.savedItem.count({ where: { appliedAt: { gte: new Date(now.getTime() - 30 * DAY) } } }),
+    prisma.applicationEvent.count({ where: { type: { in: ["interview", "oa"] }, at: { gte: now, lte: new Date(now.getTime() + 14 * DAY) } } }),
+    prisma.savedItem.count({ where: { status: "offer" } }),
+    prisma.savedItem.count({ where: { category: "coop", appliedAt: { not: null } } }),
+    prisma.savedItem.count({
+      where: { category: "coop", appliedAt: { not: null }, status: { in: ["oa", "interview", "offer", "accepted"] } },
+    }),
   ]);
-
-  const dueSoon = (deadline: Date | null) => {
-    if (!deadline) return false;
-    const urgency = urgencyOf(deadline);
-    return urgency === "today" || urgency === "urgent";
+  return {
+    active,
+    applied30d,
+    interviewsAhead,
+    offers,
+    responseRate: appliedEver >= 5 ? heardBack / appliedEver : null,
   };
-
-  const openCount =
-    postings.filter((p) => p.status === "open").length +
-    orgs.filter((o) => o.applicationStatus === "open" || o.applicationStatus === "rolling").length;
-
-  const dueSoonCount = postings.filter((p) => dueSoon(p.deadline)).length + orgs.filter((o) => dueSoon(o.deadline)).length;
-
-  return { openCount, savedCount, dueSoonCount };
 }
 
-export type FeedItem = {
-  kind: SavedCategory;
-  id: string;
-  title: string;
-  subtitle: string;
-  url: string;
-  deadline: Date | null;
-  status: string;
-  feedAt: Date;
-  isNew: boolean;
-  saved: boolean;
-};
-
-export async function getRecentFeed(limit = 20): Promise<FeedItem[]> {
-  const [postings, orgs] = await Promise.all([
-    prisma.coopPosting.findMany({ orderBy: { firstSeenAt: "desc" }, take: 30, include: { saved: true } }),
-    prisma.organization.findMany({ orderBy: { createdAt: "desc" }, take: 30, include: { saved: true } }),
-  ]);
-
-  const postingItems: FeedItem[] = postings.map((p) => ({
-    kind: "coop",
-    id: p.id,
-    title: p.role,
-    subtitle: p.company,
-    url: p.url,
-    deadline: p.deadline,
-    status: p.status,
-    feedAt: p.firstSeenAt,
-    isNew: isNewPosting(p),
-    saved: Boolean(p.saved),
-  }));
-
-  const orgItems: FeedItem[] = orgs.map((o) => ({
-    kind: o.kind as SavedCategory,
-    id: o.id,
-    title: o.name,
-    subtitle: o.kind === "design_team" ? "Design team" : "Club",
-    url: o.url,
-    deadline: o.deadline,
-    status: o.applicationStatus,
-    feedAt: o.createdAt,
-    isNew: false,
-    saved: Boolean(o.saved),
-  }));
-
-  return [...postingItems, ...orgItems].sort((a, b) => b.feedAt.getTime() - a.feedAt.getTime()).slice(0, limit);
-}
-
-export type SavedQuickItem = {
-  savedId: string;
-  category: SavedCategory;
-  status: string;
-  pinned: boolean;
-  title: string;
-  subtitle: string;
-  url: string;
-  deadline: Date | null;
-  updatedAt: Date;
-};
-
-export async function getSavedQuickAccess(limit = 8): Promise<SavedQuickItem[]> {
-  const items = await prisma.savedItem.findMany({
-    where: { status: { in: ["interested", "applied", "interview"] } },
+/** Applications that have sat in "applied" for 3+ weeks with no movement — likely ghosted. */
+export async function getStaleApplications(now: Date = new Date()) {
+  return prisma.savedItem.findMany({
+    where: { status: "applied", statusChangedAt: { lt: new Date(now.getTime() - 21 * DAY) } },
     include: { coopPosting: true, organization: true },
+    orderBy: { statusChangedAt: "asc" },
+    take: 5,
   });
+}
 
-  const mapped: SavedQuickItem[] = [];
-  for (const item of items) {
-    if (item.coopPosting) {
-      mapped.push({
-        savedId: item.id,
-        category: item.category as SavedCategory,
-        status: item.status,
-        pinned: item.pinned,
-        title: item.coopPosting.role,
-        subtitle: item.coopPosting.company,
-        url: item.coopPosting.url,
-        deadline: item.coopPosting.deadline,
-        updatedAt: item.updatedAt,
-      });
-    } else if (item.organization) {
-      mapped.push({
-        savedId: item.id,
-        category: item.category as SavedCategory,
-        status: item.status,
-        pinned: item.pinned,
-        title: item.organization.name,
-        subtitle: item.organization.kind === "design_team" ? "Design team" : "Club",
-        url: item.organization.url,
-        deadline: item.organization.deadline,
-        updatedAt: item.updatedAt,
-      });
-    }
-  }
-
-  // Nulls-last deadline sort in JS — the SQLite connector doesn't support Prisma's `nulls: "last"`
-  // ordering, and a plain ascending sort would push undated items to the top.
-  mapped.sort((a, b) => {
-    if (a.pinned !== b.pinned) return a.pinned ? -1 : 1;
-    if (a.deadline && b.deadline) return a.deadline.getTime() - b.deadline.getTime();
-    if (a.deadline) return -1;
-    if (b.deadline) return 1;
-    return b.updatedAt.getTime() - a.updatedAt.getTime();
+export async function getFreshJobs(since: Date, limit = 6) {
+  return prisma.coopPosting.findMany({
+    where: {
+      duplicateOfId: null,
+      saved: null,
+      status: { not: "closed" },
+      firstSeenAt: { gt: since },
+      OR: [{ region: { in: ["canada", "remote"] } }, { region: null }],
+    },
+    orderBy: [{ postedAt: { sort: "desc", nulls: "last" } }, { firstSeenAt: "desc" }],
+    take: limit,
   });
+}
 
-  return mapped.slice(0, limit);
+/** Design teams and clubs currently taking applications, and hackathons coming up nearby. */
+export async function getOpenOpportunities(now: Date = new Date()) {
+  const [orgs, hackathons] = await Promise.all([
+    prisma.organization.findMany({
+      where: { kind: { in: ["design_team", "club"] }, OR: [{ applicationStatus: { in: ["open", "rolling"] } }, { watchLevel: "open" }] },
+      include: { saved: true },
+      orderBy: [{ deadline: { sort: "asc", nulls: "last" } }, { sortOrder: "asc" }],
+    }),
+    prisma.organization.findMany({
+      where: { kind: "hackathon", eventStart: { gte: now }, OR: [{ region: { in: ["nearby", "online"] } }, { origin: "seed" }] },
+      include: { saved: true },
+      orderBy: { eventStart: "asc" },
+      take: 4,
+    }),
+  ]);
+  return { orgs: orgs.filter((o) => isOrgApplicable(o, now)).slice(0, 6), hackathons };
 }

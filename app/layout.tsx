@@ -1,6 +1,6 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
+import { cookies } from "next/headers";
 import { Geist, Geist_Mono } from "next/font/google";
-import { TopNav } from "@/components/TopNav";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -14,20 +14,28 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Coop Hub",
-  description: "Personal tracker for UW co-op postings, design teams, and clubs.",
+  title: { default: "TappedIn", template: "%s · TappedIn" },
+  description: "Co-op postings, applications, hackathons, design teams and clubs — all in one place.",
+  robots: { index: false, follow: false },
 };
 
-export default function RootLayout({ children }: LayoutProps<"/">) {
+export const viewport: Viewport = {
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#f6f6f8" },
+    { media: "(prefers-color-scheme: dark)", color: "#09090b" },
+  ],
+};
+
+export default async function RootLayout({ children }: LayoutProps<"/">) {
+  const theme = (await cookies()).get("theme")?.value;
   return (
     <html
       lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} dark h-full antialiased`}
+      data-theme={theme === "light" || theme === "dark" ? theme : undefined}
+      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      suppressHydrationWarning
     >
-      <body className="min-h-full bg-bg font-sans text-text">
-        <TopNav />
-        <main className="mx-auto max-w-3xl px-4 pt-6 pb-24">{children}</main>
-      </body>
+      <body className="min-h-full font-sans text-text">{children}</body>
     </html>
   );
 }

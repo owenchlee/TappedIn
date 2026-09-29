@@ -1,29 +1,50 @@
 "use client";
 
 import { clsx } from "clsx";
-import type { BadgeVariant } from "@/components/ui/Badge";
+import { ChevronDown } from "lucide-react";
+import { BADGE_CLASSES, type BadgeVariant } from "@/components/ui/Badge";
+import { stageLabel, type SavedCategory } from "@/lib/types";
 
-const STATUS_VARIANT: Record<string, BadgeVariant> = {
-  open: "new",
+export const STATUS_VARIANT: Record<string, BadgeVariant> = {
+  // posting / org availability
+  open: "emerald",
   rolling: "accent",
   unknown: "muted",
   closed: "muted",
+  // application stages
   interested: "muted",
-  applied: "accent",
-  interview: "urgent",
-  rejected: "overdue",
-  accepted: "new",
+  applied: "sky",
+  oa: "violet",
+  interview: "amber",
+  offer: "emerald",
+  accepted: "emerald",
+  attended: "emerald",
+  rejected: "rose",
+  ghosted: "zinc",
+  withdrawn: "zinc",
 };
 
-const VARIANT_CLASSES: Record<BadgeVariant, string> = {
-  muted: "bg-surface-2 text-muted ring-border-strong",
-  new: "bg-new/15 text-new ring-new/40",
-  urgent: "bg-urgent/15 text-urgent ring-urgent/40",
-  overdue: "bg-overdue/15 text-overdue ring-overdue/40",
-  accent: "bg-accent/15 text-accent-hover ring-accent/40",
+const DOT: Record<BadgeVariant, string> = {
+  muted: "bg-muted-2",
+  new: "bg-new",
+  urgent: "bg-urgent",
+  overdue: "bg-overdue",
+  accent: "bg-accent",
+  sky: "bg-sky",
+  violet: "bg-violet",
+  amber: "bg-amber",
+  emerald: "bg-emerald",
+  rose: "bg-rose",
+  zinc: "bg-zinc",
 };
 
-function labelFor(value: string): string {
+export function statusDotClass(value: string): string {
+  return DOT[STATUS_VARIANT[value] ?? "muted"];
+}
+
+function labelFor(value: string, category?: SavedCategory): string {
+  const staged = stageLabel(value, category);
+  if (staged !== value) return staged;
   return value.charAt(0).toUpperCase() + value.slice(1);
 }
 
@@ -32,42 +53,52 @@ export function StatusPill({
   options,
   onChange,
   disabled,
+  category,
+  className,
 }: {
   value: string;
   options?: readonly string[];
   onChange?: (next: string) => void;
   disabled?: boolean;
+  category?: SavedCategory;
+  className?: string;
 }) {
   const variant = STATUS_VARIANT[value] ?? "muted";
   const classes = clsx(
-    "inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ring-1",
-    VARIANT_CLASSES[variant],
+    "inline-flex h-6 items-center gap-1.5 rounded-md px-2 text-xs font-medium ring-1 ring-inset",
+    BADGE_CLASSES[variant],
+    className,
   );
+  const dot = <span className={clsx("size-1.5 rounded-full", DOT[variant])} />;
 
   if (!onChange || !options) {
-    return <span className={classes}>{labelFor(value)}</span>;
+    return (
+      <span className={classes}>
+        {dot}
+        {labelFor(value, category)}
+      </span>
+    );
   }
 
   return (
-    <select
-      className={clsx(classes, "cursor-pointer appearance-none border-0 pr-5 outline-none")}
-      style={{
-        backgroundImage:
-          "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='currentColor'%3E%3Cpath fill-rule='evenodd' d='M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z' clip-rule='evenodd'/%3E%3C/svg%3E\")",
-        backgroundRepeat: "no-repeat",
-        backgroundPosition: "right 4px center",
-        backgroundSize: "12px",
-      }}
-      value={value}
-      disabled={disabled}
-      onChange={(e) => onChange(e.target.value)}
-      onClick={(e) => e.stopPropagation()}
-    >
-      {options.map((opt) => (
-        <option key={opt} value={opt} className="bg-surface text-text">
-          {labelFor(opt)}
-        </option>
-      ))}
-    </select>
+    <label className={clsx(classes, "relative cursor-pointer pr-1", disabled && "opacity-60")}>
+      {dot}
+      <span>{labelFor(value, category)}</span>
+      <ChevronDown className="size-3 opacity-70" />
+      <select
+        aria-label="Change status"
+        className="absolute inset-0 cursor-pointer opacity-0"
+        value={value}
+        disabled={disabled}
+        onChange={(e) => onChange(e.target.value)}
+        onClick={(e) => e.stopPropagation()}
+      >
+        {options.map((opt) => (
+          <option key={opt} value={opt}>
+            {labelFor(opt, category)}
+          </option>
+        ))}
+      </select>
+    </label>
   );
 }

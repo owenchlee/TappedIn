@@ -1,3 +1,4 @@
+import { CalendarClock } from "lucide-react";
 import { Badge, type BadgeVariant } from "@/components/ui/Badge";
 import { deadlineLabel, urgencyOf } from "@/lib/deadline";
 import type { Urgency } from "@/lib/types";
@@ -14,5 +15,10 @@ const URGENCY_VARIANT: Record<Urgency, BadgeVariant> = {
 export function DeadlineBadge({ deadline }: { deadline: Date | null }) {
   if (!deadline) return null;
   const urgency = urgencyOf(deadline);
-  return <Badge variant={URGENCY_VARIANT[urgency]}>{deadlineLabel(deadline)}</Badge>;
+  return (
+    <Badge variant={URGENCY_VARIANT[urgency]}>
+      <CalendarClock className="size-3" />
+      {deadlineLabel(deadline)}
+    </Badge>
+  );
 }

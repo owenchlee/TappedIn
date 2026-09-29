@@ -18,6 +18,10 @@ export function applyMatch(postings: RawPosting[], match: SourceMatch | undefine
     const includeLocation = testPattern(match.includeLocation, posting.location);
     if (includeLocation === false) return false;
 
+    if (match.regions && match.regions.length > 0) {
+      if (!posting.region || !match.regions.includes(posting.region)) return false;
+    }
+
     return true;
   });
 }

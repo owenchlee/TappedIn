@@ -6,8 +6,20 @@ import { saveNotes } from "@/actions/notes";
 
 type SaveState = "idle" | "saving" | "saved" | "error";
 
-export function NotesEditor({ kind, id, initialNotes }: { kind: "coop" | "org"; id: string; initialNotes: string }) {
-  const [expanded, setExpanded] = useState(Boolean(initialNotes));
+export function NotesEditor({
+  kind,
+  id,
+  initialNotes,
+  alwaysOpen,
+  placeholder = "Notes…",
+}: {
+  kind: "coop" | "org";
+  id: string;
+  initialNotes: string;
+  alwaysOpen?: boolean;
+  placeholder?: string;
+}) {
+  const [expanded, setExpanded] = useState(Boolean(initialNotes) || Boolean(alwaysOpen));
   const [value, setValue] = useState(initialNotes);
   const [state, setState] = useState<SaveState>("idle");
   const [, startTransition] = useTransition();
@@ -41,11 +53,7 @@ export function NotesEditor({ kind, id, initialNotes }: { kind: "coop" | "org"; 
 
   if (!expanded) {
     return (
-      <button
-        type="button"
-        onClick={() => setExpanded(true)}
-        className="text-xs text-muted hover:text-text hover:underline"
-      >
+      <button type="button" onClick={() => setExpanded(true)} className="self-start text-xs text-muted-2 hover:text-text">
         + Add notes
       </button>
     );
@@ -55,8 +63,8 @@ export function NotesEditor({ kind, id, initialNotes }: { kind: "coop" | "org"; 
     <div className="space-y-1">
       <Textarea
         value={value}
-        placeholder="Notes…"
-        rows={2}
+        placeholder={placeholder}
+        rows={alwaysOpen ? 4 : 2}
         onChange={(e) => {
           setValue(e.target.value);
           scheduleSave(e.target.value);
@@ -65,7 +73,7 @@ export function NotesEditor({ kind, id, initialNotes }: { kind: "coop" | "org"; 
           if (timeoutRef.current) clearTimeout(timeoutRef.current);
           flush(e.target.value);
         }}
-        className="text-xs"
+        className={alwaysOpen ? "border-0 bg-transparent px-0 shadow-none focus:ring-0" : "text-xs"}
       />
       <div className="h-3 text-right text-[11px] text-muted-2">
         {state === "saving" && "Saving…"}

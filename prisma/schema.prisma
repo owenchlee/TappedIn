@@ -4,9 +4,10 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
 }
 
+/// A job/co-op posting — added by hand (WaterlooWorks, a referral, anywhere) or pulled by a source.
 model CoopPosting {
   id           String    @id @default(cuid())
   company      String
@@ -20,6 +21,20 @@ model CoopPosting {
   origin       String    @default("manual") // manual | fetched
   sourceKey    String?
   externalKey  String?
+
+  // Normalized facets, filled from the source (or inferred from title/location) so the Jobs page can filter.
+  terms        String[]  @default([]) // UW-style term codes: F26 | W27 | S27 …
+  category     String? // software | hardware | ai_data | quant | product | other
+  region       String? // canada | remote | us | intl
+  postedAt     DateTime?
+
+  // Cross-source dedupe: the same job listed by Simplify, the Canadian list, and the company's own
+  // board collapses onto one canonical row; the others point at it via duplicateOfId and stay hidden.
+  urlKey        String?
+  titleKey      String?
+  duplicateOfId String?
+  duplicateOf   CoopPosting?  @relation("PostingDuplicates", fields: [duplicateOfId], references: [id], onDelete: SetNull)
+  duplicates    CoopPosting[] @relation("PostingDuplicates")
 
   firstSeenAt    DateTime  @default(now())
   lastSeenAt     DateTime?
@@ -37,11 +52,15 @@ model CoopPosting {
   @@index([status])
   @@index([deadline])
   @@index([firstSeenAt])
+  @@index([urlKey])
+  @@index([titleKey])
+  @@index([duplicateOfId])
+  @@index([region])
 }
 
 model Organization {
   id                String    @id @default(cuid())
-  kind              String // design_team | club
+  kind              String // design_team | club | hackathon
   slug              String    @unique
   name              String
   url               String
@@ -50,10 +69,29 @@ model Organization {
   tagsJson          String    @default("[]")
   applicationStatus String    @default("unknown") // open | closed | rolling | unknown
   deadline          DateTime?
+  // Event dates (hackathons) — seed-managed from data/*.json (dateInputToStorage, UTC noon), or
+  // source-managed for MLH imports; overwritten on every re-seed/re-fetch.
+  eventStart        DateTime?
+  eventEnd          DateTime?
   notes             String    @default("")
   lastCheckedAt     DateTime?
   managed           Boolean   @default(true)
   sortOrder         Int       @default(0)
+
+  // Where the row came from: "seed" (data/*.json) or "mlh" (auto-imported hackathon list).
+  origin            String    @default("seed")
+  location          String?
+  region            String? // nearby | canada | online | us
+  online            Boolean   @default(false)
+
+  // Daily site watcher (lib/watch) — null means "never scanned".
+  watchLevel        String? // none | soon | open
+  watchYear         Int?
+  watchedAt         DateTime?
+  watchError        String?
+  signal            String?
+  signalAt          DateTime?
+  signalSeenAt      DateTime?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -64,12 +102,23 @@ model Organization {
   @@index([deadline])
 }
 
+/// An application you're tracking — for a posting or an org (design team / club / hackathon).
 model SavedItem {
   id        String    @id @default(cuid())
-  category  String // coop | design_team | club
-  status    String    @default("interested") // interested | applied | interview | rejected | accepted
+  category  String // coop | design_team | club | hackathon
+  // interested | applied | oa | interview | offer | accepted | rejected | ghosted | withdrawn | attended
+  status    String    @default("interested")
   pinned    Boolean   @default(true)
   appliedAt DateTime?
+  statusChangedAt DateTime @default(now())
+
+  term       String? // UW term this is for, e.g. "W27"
+  channel    String? // waterlooworks | direct | referral | other
+  refId      String? // WaterlooWorks job ID / req number
+  resume     String? // which resume version you sent
+  pay        String? // e.g. "$32/hr"
+  nextStep   String    @default("")
+  nextStepAt DateTime?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -80,14 +129,77 @@ model SavedItem {
   organizationId String?       @unique
   organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
+  events   ApplicationEvent[]
+  contacts Contact[]
+  workTerm Term?
+
   @@index([status])
+  @@index([nextStepAt])
+}
+
+/// Timeline entry on an application: automatic stage changes, plus OAs/interviews/offers you log.
+model ApplicationEvent {
+  id          String   @id @default(cuid())
+  savedItemId String
+  type        String // stage | oa | interview | offer | follow_up | note
+  title       String   @default("")
+  at          DateTime
+  fromStatus  String?
+  toStatus    String?
+  notes       String   @default("")
+  createdAt   DateTime @default(now())
+
+  savedItem SavedItem @relation(fields: [savedItemId], references: [id], onDelete: Cascade)
+
+  @@index([savedItemId, at])
+  @@index([at])
+}
+
+/// Recruiters, referrers, interviewers, mentors.
+model Contact {
+  id              String    @id @default(cuid())
+  name            String
+  company         String    @default("")
+  role            String    @default("")
+  email           String    @default("")
+  linkedin        String    @default("")
+  notes           String    @default("")
+  lastContactedAt DateTime?
+  followUpAt      DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  applications SavedItem[]
+
+  @@index([followUpAt])
+}
+
+/// One academic or work term in your degree — the five-year "journey" timeline.
+model Term {
+  id       String  @id @default(cuid())
+  code     String  @unique // F25 | W26 | S26 …
+  kind     String  @default("study") // study | work | off
+  label    String  @default("") // "1A", "Work term 2", …
+  company  String  @default("")
+  role     String  @default("")
+  location String  @default("")
+  pay      String  @default("")
+  rating   Int? // 1–5, how much you liked it
+  notes    String  @default("")
+
+  savedItemId String?    @unique
+  savedItem   SavedItem? @relation(fields: [savedItemId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model CompanySource {
   key      String  @id
   name     String
   careerUrl String
-  adapter  String // greenhouse | lever | generic-css | generic-json
+  adapter  String // greenhouse | lever | ashby | workday | smartrecruiters | simplify | markdown-table | generic-css | generic-json
   configJson String @default("{}")
   enabled  Boolean @default(true)
 
@@ -124,4 +236,11 @@ model JobState {
   lastRunAt DateTime?
   lastOkAt  DateTime?
   lastError String?
+}
+
+/// Small key/value store for app state (e.g. when you last opened the Today page).
+model Setting {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt
 }

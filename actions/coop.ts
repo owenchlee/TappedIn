@@ -5,11 +5,10 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { dateInputToStorage } from "@/lib/deadline";
 import { COOP_STATUSES } from "@/lib/types";
+import { manualFacets } from "@/lib/postings";
 
 function revalidateCoop() {
-  revalidatePath("/coop");
-  revalidatePath("/");
-  revalidatePath("/saved");
+  revalidatePath("/", "layout");
 }
 
 export type ActionResult = { ok: true } | { ok: false; error: string };
@@ -64,6 +63,7 @@ export async function createPosting(formData: FormData): Promise<ActionResult> {
       notes: data.notes ?? "",
       origin: "manual",
       status: "open",
+      ...manualFacets(data),
     },
   });
 
@@ -101,6 +101,7 @@ export async function updatePosting(id: string, formData: FormData): Promise<Act
       url: data.url,
       location: data.location || null,
       deadline: data.deadline ? dateInputToStorage(data.deadline) : null,
+      ...manualFacets(data),
     },
   });
 

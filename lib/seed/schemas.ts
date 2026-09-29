@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { ORG_KINDS, SOURCE_ADAPTERS } from "@/lib/types";
+import { ORG_KINDS, REGIONS, SOURCE_ADAPTERS } from "@/lib/types";
 
 export const orgSeedItemSchema = z.object({
   slug: z.string().trim().min(1),
@@ -9,6 +9,9 @@ export const orgSeedItemSchema = z.object({
   description: z.string().trim().optional(),
   tags: z.array(z.string()).default([]),
   sortOrder: z.number().default(0),
+  // "YYYY-MM-DD" — once the event starts it's hidden from the default views (can't apply anymore).
+  eventStart: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  eventEnd: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
 });
 export type OrgSeedItem = z.infer<typeof orgSeedItemSchema>;
 
@@ -23,6 +26,7 @@ export const sourceMatchSchema = z.object({
   includeTitle: z.string().optional(),
   excludeTitle: z.string().optional(),
   includeLocation: z.string().optional(),
+  regions: z.array(z.enum(REGIONS)).optional(),
 });
 
 export const companySourceSeedItemSchema = z.object({

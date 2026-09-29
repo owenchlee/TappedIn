@@ -1,6 +1,113 @@
 {
-  "version": 1,
+  "version": 2,
   "sources": [
+    {
+      "key": "canadian-tech-internships",
+      "name": "Canadian Tech Internships (negarprh)",
+      "careerUrl": "https://github.com/negarprh/Canadian-Tech-Internships-2027",
+      "adapter": "markdown-table",
+      "enabled": true,
+      "config": { "url": "https://raw.githubusercontent.com/negarprh/Canadian-Tech-Internships-{year}/main/README.md" }
+    },
+    {
+      "key": "simplify-internships",
+      "name": "Simplify internships",
+      "careerUrl": "https://github.com/SimplifyJobs/Summer2027-Internships",
+      "adapter": "simplify",
+      "enabled": true,
+      "config": { "url": "https://raw.githubusercontent.com/SimplifyJobs/Summer{year}-Internships/dev/.github/scripts/listings.json" },
+      "match": { "regions": ["canada", "remote", "us"] }
+    },
+    {
+      "key": "vanshb03-internships",
+      "name": "Summer/Fall/Winter internships (vanshb03)",
+      "careerUrl": "https://github.com/vanshb03/Summer2027-Internships",
+      "adapter": "simplify",
+      "enabled": true,
+      "config": { "url": "https://raw.githubusercontent.com/vanshb03/Summer{year}-Internships/dev/.github/scripts/listings.json" },
+      "match": { "regions": ["canada", "remote", "us"] }
+    },
+    {
+      "key": "simplify-new-grad",
+      "name": "Simplify new grad",
+      "careerUrl": "https://github.com/SimplifyJobs/New-Grad-Positions",
+      "adapter": "simplify",
+      "enabled": false,
+      "config": { "url": "https://raw.githubusercontent.com/SimplifyJobs/New-Grad-Positions/dev/.github/scripts/listings.json" },
+      "match": { "regions": ["canada", "remote", "us"] }
+    },
+    {
+      "key": "ciena",
+      "name": "Ciena",
+      "careerUrl": "https://ciena.wd5.myworkdayjobs.com/Careers",
+      "adapter": "workday",
+      "enabled": true,
+      "config": { "host": "ciena.wd5.myworkdayjobs.com", "tenant": "ciena", "site": "Careers", "searchText": "intern co-op" },
+      "match": { "includeTitle": "\\b(intern|internship|co-?op|student)\\b", "regions": ["canada", "remote"] }
+    },
+    {
+      "key": "rbc",
+      "name": "RBC",
+      "careerUrl": "https://jobs.rbc.com/",
+      "adapter": "workday",
+      "enabled": true,
+      "config": { "host": "rbc.wd3.myworkdayjobs.com", "tenant": "rbc", "site": "RBCGLOBAL1", "searchText": "co-op intern" },
+      "match": { "includeTitle": "\\b(intern|internship|co-?op|student|summer analyst)\\b", "regions": ["canada", "remote"] }
+    },
+    {
+      "key": "td",
+      "name": "TD",
+      "careerUrl": "https://jobs.td.com/",
+      "adapter": "workday",
+      "enabled": true,
+      "config": { "host": "td.wd3.myworkdayjobs.com", "tenant": "td", "site": "TD_Bank_Careers", "searchText": "co-op intern" },
+      "match": { "includeTitle": "\\b(intern|internship|co-?op|student)\\b", "regions": ["canada", "remote"] }
+    },
+    {
+      "key": "nvidia",
+      "name": "NVIDIA",
+      "careerUrl": "https://nvidia.wd5.myworkdayjobs.com/NVIDIAExternalCareerSite",
+      "adapter": "workday",
+      "enabled": true,
+      "config": { "host": "nvidia.wd5.myworkdayjobs.com", "tenant": "nvidia", "site": "NVIDIAExternalCareerSite", "searchText": "intern" },
+      "match": { "includeTitle": "\\b(intern|internship|co-?op|student)\\b", "regions": ["canada", "remote", "us"] }
+    },
+    {
+      "key": "cohere",
+      "name": "Cohere",
+      "careerUrl": "https://jobs.ashbyhq.com/cohere",
+      "adapter": "ashby",
+      "enabled": true,
+      "config": { "org": "cohere" },
+      "match": { "includeTitle": "\\b(intern|internship|co-?op|student)\\b" }
+    },
+    {
+      "key": "wealthsimple",
+      "name": "Wealthsimple",
+      "careerUrl": "https://jobs.ashbyhq.com/wealthsimple",
+      "adapter": "ashby",
+      "enabled": true,
+      "config": { "org": "wealthsimple" },
+      "match": { "includeTitle": "\\b(intern|internship|co-?op|student)\\b" }
+    },
+    {
+      "key": "ramp",
+      "name": "Ramp",
+      "careerUrl": "https://jobs.ashbyhq.com/ramp",
+      "adapter": "ashby",
+      "enabled": true,
+      "config": { "org": "ramp" },
+      "match": { "includeTitle": "\\b(intern|internship|co-?op|student)\\b" }
+    },
+    {
+      "key": "notion",
+      "name": "Notion",
+      "careerUrl": "https://jobs.ashbyhq.com/notion",
+      "adapter": "ashby",
+      "enabled": true,
+      "config": { "org": "notion" },
+      "match": { "includeTitle": "\\b(intern|internship|co-?op|student)\\b" }
+    },
     {
       "key": "robinhood",
       "name": "Robinhood",
@@ -9,7 +116,7 @@
       "enabled": true,
       "config": { "boardToken": "robinhood" },
       "match": {
-        "includeTitle": "(intern|co-?op|university|new grad)",
+        "includeTitle": "\\b(intern|internship|co-?op|university|new grad)\\b",
         "excludeTitle": "(senior|staff|principal|director|lead\\b)"
       }
     },
@@ -21,7 +128,7 @@
       "enabled": true,
       "config": { "company": "palantir" },
       "match": {
-        "includeTitle": "(intern|co-?op|university|new grad)",
+        "includeTitle": "\\b(intern|internship|co-?op|university|new grad)\\b",
         "includeLocation": "(canada|remote|toronto|ottawa|waterloo|new york|washington)"
       }
     }

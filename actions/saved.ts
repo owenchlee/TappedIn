@@ -3,45 +3,39 @@
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { Prisma } from "@/lib/generated/prisma/client";
-import type { SavedCategory, SavedStatus } from "@/lib/types";
-import { SAVED_CATEGORIES, SAVED_STATUSES } from "@/lib/types";
-import type { OrgKind } from "@/lib/types";
+import type { OrgKind, SavedCategory, SavedStatus } from "@/lib/types";
+import { SAVED_CATEGORIES } from "@/lib/types";
+import { setStage, trackPosting } from "@/actions/applications";
 
 function revalidateAll() {
-  revalidatePath("/coop");
-  revalidatePath("/design-teams");
-  revalidatePath("/clubs");
-  revalidatePath("/");
-  revalidatePath("/saved");
-}
-
-function fkFieldFor(category: SavedCategory): "coopPostingId" | "organizationId" {
-  return category === "coop" ? "coopPostingId" : "organizationId";
+  revalidatePath("/", "layout");
 }
 
 function isP2002(err: unknown): boolean {
   return err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002";
 }
 
-/** Confirms `itemId` actually exists and matches `category`, so a stale or forged id can't create
- * a SavedItem row whose two-FK-plus-category invariant no longer lines up. */
-async function entityMatchesCategory(category: SavedCategory, itemId: string): Promise<boolean> {
-  if (category === "coop") {
-    const posting = await prisma.coopPosting.findUnique({ where: { id: itemId }, select: { id: true } });
-    return posting != null;
-  }
-  const org = await prisma.organization.findUnique({ where: { id: itemId }, select: { kind: true } });
-  return org != null && org.kind === (category as OrgKind);
-}
-
+/** Bookmark toggle on job/org cards: saving starts tracking at "Saved"; unsaving stops tracking. */
 export async function toggleSave(category: SavedCategory, itemId: string): Promise<boolean> {
   if (!SAVED_CATEGORIES.includes(category)) {
     throw new Error(`Invalid category: ${category}`);
   }
 
-  const field = fkFieldFor(category);
-  const existing = await prisma.savedItem.findFirst({ where: { [field]: itemId } });
+  if (category === "coop") {
+    const posting = await prisma.coopPosting.findUnique({ where: { id: itemId }, select: { duplicateOfId: true } });
+    if (!posting) throw new Error(`No posting found for id ${itemId}`);
+    const targetId = posting.duplicateOfId ?? itemId;
+    const existing = await prisma.savedItem.findUnique({ where: { coopPostingId: targetId } });
+    if (existing) {
+      await prisma.savedItem.delete({ where: { id: existing.id } }).catch(() => {});
+      revalidateAll();
+      return false;
+    }
+    await trackPosting(targetId);
+    return true;
+  }
 
+  const existing = await prisma.savedItem.findUnique({ where: { organizationId: itemId } });
   if (existing) {
     await prisma.savedItem.delete({ where: { id: existing.id } }).catch(() => {
       // Already deleted by a concurrent toggle — treat as success either way.
@@ -50,16 +44,17 @@ export async function toggleSave(category: SavedCategory, itemId: string): Promi
     return false;
   }
 
-  if (!(await entityMatchesCategory(category, itemId))) {
-    throw new Error(`No ${category} item found for id ${itemId}`);
-  }
+  const org = await prisma.organization.findUnique({ where: { id: itemId }, select: { kind: true } });
+  if (!org || org.kind !== (category as OrgKind)) throw new Error(`No ${category} item found for id ${itemId}`);
 
   try {
-    await prisma.savedItem.create({ data: { category, [field]: itemId } });
+    const now = new Date();
+    await prisma.savedItem.create({
+      data: { category, organizationId: itemId, statusChangedAt: now, events: { create: { type: "stage", at: now, toStatus: "interested" } } },
+    });
   } catch (err) {
-    // Two concurrent toggles both saw "not saved" and both tried to create — the unique index on
-    // the FK means only one create wins; treat the loser as a success too, since the end state
-    // (saved) is what both callers wanted.
+    // Two concurrent toggles both saw "not saved" — the unique FK means only one create wins, and the
+    // end state (saved) is what both callers wanted.
     if (!isP2002(err)) throw err;
   }
 
@@ -68,16 +63,7 @@ export async function toggleSave(category: SavedCategory, itemId: string): Promi
 }
 
 export async function updateSavedStatus(savedId: string, status: SavedStatus) {
-  if (!SAVED_STATUSES.includes(status)) {
-    throw new Error(`Invalid status: ${status}`);
-  }
-  const current = await prisma.savedItem.findUnique({ where: { id: savedId } });
-  const data: { status: SavedStatus; appliedAt?: Date } = { status };
-  if (status === "applied" && current?.appliedAt == null) {
-    data.appliedAt = new Date();
-  }
-  await prisma.savedItem.update({ where: { id: savedId }, data });
-  revalidateAll();
+  await setStage(savedId, status);
 }
 
 export async function setPinned(savedId: string, pinned: boolean) {

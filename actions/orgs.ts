@@ -7,10 +7,7 @@ import { ORG_STATUSES } from "@/lib/types";
 import type { OrgStatus } from "@/lib/types";
 
 function revalidateOrgs() {
-  revalidatePath("/design-teams");
-  revalidatePath("/clubs");
-  revalidatePath("/");
-  revalidatePath("/saved");
+  revalidatePath("/", "layout");
 }
 
 export async function markChecked(id: string) {
@@ -24,6 +21,11 @@ export async function setOrgStatus(id: string, status: string) {
   }
   // Changing status implies the user just looked at the source.
   await prisma.organization.update({ where: { id }, data: { applicationStatus: status, lastCheckedAt: new Date() } });
+  revalidateOrgs();
+}
+
+export async function dismissSignal(id: string) {
+  await prisma.organization.update({ where: { id }, data: { signalSeenAt: new Date() } });
   revalidateOrgs();
 }
 

@@ -9,6 +9,7 @@ const LINKS = [
   { href: "/coop", label: "Co-op" },
   { href: "/design-teams", label: "Design Teams" },
   { href: "/clubs", label: "Clubs" },
+  { href: "/hackathons", label: "Hackathons" },
   { href: "/saved", label: "Saved" },
 ];
 

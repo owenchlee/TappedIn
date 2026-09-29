@@ -1,10 +1,10 @@
 import { clsx } from "clsx";
 import type { Urgency } from "@/lib/types";
 
-const URGENCY_BORDER: Record<Urgency, string> = {
-  overdue: "border-l-2 border-l-overdue",
-  today: "border-l-2 border-l-urgent",
-  urgent: "border-l-2 border-l-urgent",
+const URGENCY_RING: Record<Urgency, string> = {
+  overdue: "before:bg-overdue",
+  today: "before:bg-urgent",
+  urgent: "before:bg-urgent",
   soon: "",
   far: "",
   none: "",
@@ -14,16 +14,21 @@ export function Card({
   children,
   className,
   urgency = "none",
+  padded = true,
 }: {
   children: React.ReactNode;
   className?: string;
   urgency?: Urgency;
+  padded?: boolean;
 }) {
+  const accent = URGENCY_RING[urgency];
   return (
     <div
       className={clsx(
-        "rounded-lg border border-border bg-surface p-4",
-        URGENCY_BORDER[urgency],
+        "relative rounded-xl border border-border bg-surface shadow-card",
+        padded && "p-4",
+        accent && "overflow-hidden before:absolute before:inset-y-0 before:left-0 before:w-[3px]",
+        accent,
         className,
       )}
     >

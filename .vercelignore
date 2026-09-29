@@ -1,0 +1,10 @@
+# Never upload personal files or local state to Vercel.
+/private
+.env
+.env.*
+!.env.example
+*.db
+*.db-journal
+/node_modules
+/.next
+/coverage

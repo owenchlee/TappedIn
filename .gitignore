@@ -49,3 +49,9 @@ next-env.d.ts
 *.db-journal
 *.db-wal
 *.db-shm
+
+# auto-apply: resumes, profile, tailored applications, browser profile (personal data, never commit)
+/private
+
+.vercel
+.env*

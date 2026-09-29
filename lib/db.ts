@@ -1,25 +1,21 @@
 import "dotenv/config";
 import { PrismaClient } from "@/lib/generated/prisma/client";
-import { PrismaBetterSqlite3 } from "@prisma/adapter-better-sqlite3";
-import { resolveDatabaseUrl } from "@/lib/dbUrl";
+import { PrismaPg } from "@prisma/adapter-pg";
 
-// Always cached on globalThis, in every environment — not just dev. Next.js can evaluate this
-// module as separate bundled instances across instrumentation.ts, route handlers, and server
-// actions even within a single long-lived process, and globalThis is the only thing guaranteed
-// to be shared across all of them.
+// Cached on globalThis in every environment: Next.js can evaluate this module as separate bundled
+// instances across instrumentation.ts, route handlers, and server actions within one process, and
+// globalThis is the only thing guaranteed to be shared across all of them.
 const globalForPrisma = globalThis as unknown as { prisma: PrismaClient | undefined };
 
 function createClient(): PrismaClient {
-  const adapter = new PrismaBetterSqlite3({ url: resolveDatabaseUrl(process.env.DATABASE_URL) });
-  const client = new PrismaClient({ adapter });
-
-  // Fire-and-forget, but never silently: an unhandled rejection here would crash the process on
-  // import. WAL lets the cron job write while a request reads; busy_timeout avoids SQLITE_BUSY
-  // when a request lands mid-write.
-  client.$executeRawUnsafe("PRAGMA journal_mode=WAL;").catch((err) => console.error("[db] Failed to set WAL mode:", err));
-  client.$executeRawUnsafe("PRAGMA busy_timeout=5000;").catch((err) => console.error("[db] Failed to set busy_timeout:", err));
-
-  return client;
+  const connectionString = process.env.DATABASE_URL;
+  if (!connectionString) throw new Error("DATABASE_URL is not set");
+  // Serverless functions each hold their own pool — keep it small so a burst of cold starts can't
+  // exhaust a free-tier Postgres connection limit. Local `prisma dev` (PGlite) only serves one
+  // connection at a time, so .env sets DB_POOL_MAX=1 there.
+  const max = Number(process.env.DB_POOL_MAX) || (process.env.VERCEL ? 3 : 10);
+  const adapter = new PrismaPg({ connectionString, max });
+  return new PrismaClient({ adapter });
 }
 
 export const prisma = globalForPrisma.prisma ?? createClient();

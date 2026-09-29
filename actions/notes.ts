@@ -6,11 +6,7 @@ import { prisma } from "@/lib/db";
 const MAX_NOTES_LENGTH = 5000;
 
 function revalidateAll() {
-  revalidatePath("/coop");
-  revalidatePath("/design-teams");
-  revalidatePath("/clubs");
-  revalidatePath("/");
-  revalidatePath("/saved");
+  revalidatePath("/", "layout");
 }
 
 export async function saveNotes(kind: "coop" | "org", id: string, notes: string) {

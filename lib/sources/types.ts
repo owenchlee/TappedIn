@@ -1,4 +1,4 @@
-import type { SourceAdapterKey } from "@/lib/types";
+import type { JobCategory, Region, SourceAdapterKey } from "@/lib/types";
 
 export type RawPosting = {
   title: string;
@@ -6,12 +6,19 @@ export type RawPosting = {
   location?: string;
   postedAt?: Date;
   deadline?: Date;
+  /** Aggregator sources (Simplify, the Canadian list) list many companies — the source name isn't it. */
+  company?: string;
+  terms?: string[];
+  category?: JobCategory;
+  region?: Region;
 };
 
 export type SourceMatch = {
   includeTitle?: string;
   excludeTitle?: string;
   includeLocation?: string;
+  /** Keep only postings whose inferred region is in this list (e.g. ["canada", "remote", "us"]). */
+  regions?: Region[];
 };
 
 export type LoadedSource = {
@@ -27,6 +34,7 @@ export type LoadedSource = {
 export type FetchCtx = {
   fetchText(url: string): Promise<string>;
   fetchJson<T = unknown>(url: string): Promise<T>;
+  postJson<T = unknown>(url: string, body: unknown): Promise<T>;
 };
 
 export type SourceAdapter = {

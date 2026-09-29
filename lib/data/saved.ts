@@ -48,7 +48,12 @@ export async function listSavedItems(sort: SavedSort = "recent"): Promise<SavedI
         entityKind: "org",
         entityId: item.organization.id,
         title: item.organization.name,
-        subtitle: item.organization.kind === "design_team" ? "Design team" : "Club",
+        subtitle:
+          item.organization.kind === "design_team"
+            ? "Design team"
+            : item.organization.kind === "club"
+              ? "Club"
+              : "Hackathon",
         url: item.organization.url,
         deadline: item.organization.deadline,
         notes: item.organization.notes,

@@ -1,6 +1,7 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { prisma } from "@/lib/db";
+import { dateInputToStorage } from "@/lib/deadline";
 import { companySourceSeedFileSchema, orgSeedFileSchema } from "@/lib/seed/schemas";
 import type { OrgKind } from "@/lib/types";
 
@@ -31,6 +32,8 @@ async function seedOrgs(relativePath: string, expectedKind: OrgKind): Promise<vo
       description: item.description ?? "",
       tagsJson: JSON.stringify(item.tags),
       sortOrder: item.sortOrder,
+      eventStart: item.eventStart ? dateInputToStorage(item.eventStart) : null,
+      eventEnd: item.eventEnd ? dateInputToStorage(item.eventEnd) : null,
       managed: true,
     };
     // Only the fields above are ever overwritten on update — applicationStatus, notes, deadline,
@@ -44,7 +47,7 @@ async function seedOrgs(relativePath: string, expectedKind: OrgKind): Promise<vo
 
   const seededSlugs = items.map((i) => i.slug);
   await prisma.organization.updateMany({
-    where: { kind, managed: true, slug: { notIn: seededSlugs } },
+    where: { kind, origin: "seed", managed: true, slug: { notIn: seededSlugs } },
     data: { managed: false },
   });
 }
@@ -84,6 +87,7 @@ export async function seedAll(): Promise<void> {
   const tasks: [string, () => Promise<void>][] = [
     ["data/design-teams.json", () => seedOrgs("data/design-teams.json", "design_team")],
     ["data/clubs.json", () => seedOrgs("data/clubs.json", "club")],
+    ["data/hackathons.json", () => seedOrgs("data/hackathons.json", "hackathon")],
     ["data/company-sources.json", () => seedCompanySources()],
   ];
 

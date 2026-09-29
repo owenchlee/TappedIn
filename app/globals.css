@@ -1,40 +1,193 @@
 @import "tailwindcss";
 
-@theme {
-  --color-bg: #09090b;
-  --color-surface: #18181b;
-  --color-surface-2: #27272a;
-  --color-border: #27272a;
-  --color-border-strong: #3f3f46;
-  --color-text: #fafafa;
-  --color-muted: #a1a1aa;
-  --color-muted-2: #71717a;
-  --color-accent: #6366f1;
-  --color-accent-hover: #818cf8;
-  --color-urgent: #f59e0b;
-  --color-overdue: #f43f5e;
-  --color-new: #10b981;
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
+/* ---------------------------------------------------------------------------------------------
+   Design tokens. Light is the base; dark applies when the OS prefers it (unless the user picked
+   light) or when the user picked dark explicitly. Components only ever use the semantic names.
+   --------------------------------------------------------------------------------------------- */
+:root {
+  --bg: #f6f6f8;
+  --bg-elevated: #fbfbfc;
+  --surface: #ffffff;
+  --surface-2: #f2f2f5;
+  --surface-3: #e9e9ee;
+  --border: #e6e6ec;
+  --border-strong: #d3d3db;
+  --text: #16161a;
+  --muted: #55555f;
+  --muted-2: #8b8b96;
+  --accent: #6552e8;
+  --accent-hover: #5540df;
+  --accent-soft: #eeebfd;
+  --accent-fg: #ffffff;
+  --urgent: #c77700;
+  --overdue: #d92d4f;
+  --new: #0f9f6e;
+  --sky: #0a84c6;
+  --violet: #7c4ddb;
+  --amber: #c77700;
+  --emerald: #0f9f6e;
+  --rose: #d92d4f;
+  --zinc: #71717a;
+  --shadow: 0 1px 2px rgb(16 16 24 / 0.04), 0 1px 1px rgb(16 16 24 / 0.02);
+  --shadow-lg: 0 12px 32px -8px rgb(16 16 24 / 0.18), 0 2px 6px rgb(16 16 24 / 0.06);
+  --glow: radial-gradient(1200px 500px at 15% -10%, rgb(101 82 232 / 0.07), transparent 60%);
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #09090b;
+    --bg-elevated: #0e0e11;
+    --surface: #121215;
+    --surface-2: #19191e;
+    --surface-3: #222228;
+    --border: #232329;
+    --border-strong: #31313a;
+    --text: #f4f4f6;
+    --muted: #a3a3ad;
+    --muted-2: #6f6f7a;
+    --accent: #8f7ffb;
+    --accent-hover: #a597fc;
+    --accent-soft: #1d1a33;
+    --accent-fg: #0b0a14;
+    --urgent: #f5b83d;
+    --overdue: #fb6f8a;
+    --new: #34d399;
+    --sky: #5ab8f0;
+    --violet: #b08cff;
+    --amber: #f5b83d;
+    --emerald: #34d399;
+    --rose: #fb6f8a;
+    --zinc: #9d9da8;
+    --shadow: 0 1px 2px rgb(0 0 0 / 0.4);
+    --shadow-lg: 0 16px 40px -8px rgb(0 0 0 / 0.6), 0 2px 8px rgb(0 0 0 / 0.4);
+    --glow: radial-gradient(1200px 500px at 15% -10%, rgb(143 127 251 / 0.09), transparent 60%);
+    color-scheme: dark;
+  }
+}
+
+:root[data-theme="dark"] {
+  --bg: #09090b;
+  --bg-elevated: #0e0e11;
+  --surface: #121215;
+  --surface-2: #19191e;
+  --surface-3: #222228;
+  --border: #232329;
+  --border-strong: #31313a;
+  --text: #f4f4f6;
+  --muted: #a3a3ad;
+  --muted-2: #6f6f7a;
+  --accent: #8f7ffb;
+  --accent-hover: #a597fc;
+  --accent-soft: #1d1a33;
+  --accent-fg: #0b0a14;
+  --urgent: #f5b83d;
+  --overdue: #fb6f8a;
+  --new: #34d399;
+  --sky: #5ab8f0;
+  --violet: #b08cff;
+  --amber: #f5b83d;
+  --emerald: #34d399;
+  --rose: #fb6f8a;
+  --zinc: #9d9da8;
+  --shadow: 0 1px 2px rgb(0 0 0 / 0.4);
+  --shadow-lg: 0 16px 40px -8px rgb(0 0 0 / 0.6), 0 2px 8px rgb(0 0 0 / 0.4);
+  --glow: radial-gradient(1200px 500px at 15% -10%, rgb(143 127 251 / 0.09), transparent 60%);
+  color-scheme: dark;
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-bg-elevated: var(--bg-elevated);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-surface-3: var(--surface-3);
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-text: var(--text);
+  --color-muted: var(--muted);
+  --color-muted-2: var(--muted-2);
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-soft: var(--accent-soft);
+  --color-accent-fg: var(--accent-fg);
+  --color-urgent: var(--urgent);
+  --color-overdue: var(--overdue);
+  --color-new: var(--new);
+  --color-sky: var(--sky);
+  --color-violet: var(--violet);
+  --color-amber: var(--amber);
+  --color-emerald: var(--emerald);
+  --color-rose: var(--rose);
+  --color-zinc: var(--zinc);
+  --shadow-card: var(--shadow);
+  --shadow-pop: var(--shadow-lg);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
 
 html {
-  color-scheme: dark;
+  background: var(--bg);
 }
 
 body {
-  background: var(--color-bg);
-  color: var(--color-text);
+  background: var(--glow), var(--bg);
+  background-attachment: fixed;
+  color: var(--text);
+  font-feature-settings: "cv11", "ss01";
 }
 
 * {
-  border-color: var(--color-border);
+  border-color: var(--border);
 }
 
 ::selection {
-  background: color-mix(in oklab, var(--color-accent) 40%, transparent);
+  background: color-mix(in oklab, var(--accent) 30%, transparent);
 }
 
 textarea {
   field-sizing: content;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+/* Thin, quiet scrollbars (the board scrolls horizontally). */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-strong) transparent;
+}
+
+dialog::backdrop {
+  background: rgb(0 0 0 / 0.45);
+  backdrop-filter: blur(3px);
+}
+
+@keyframes pop-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.animate-pop-in {
+  animation: pop-in 160ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 1ms !important;
+    transition-duration: 1ms !important;
+  }
 }

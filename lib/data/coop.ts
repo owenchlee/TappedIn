@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/db";
 import type { CoopPosting, SavedItem } from "@/lib/generated/prisma/client";
+import { isPastDate } from "@/lib/deadline";
 
 export type CoopPostingView = CoopPosting & { saved: SavedItem | null };
 
@@ -8,15 +9,11 @@ export type CoopSort = "deadline" | "recent";
 export async function listPostings(opts: { showClosed?: boolean; sort?: CoopSort } = {}): Promise<CoopPostingView[]> {
   const { showClosed = false, sort = "recent" } = opts;
 
-  const postings = await prisma.coopPosting.findMany({
-    where: showClosed
-      ? undefined
-      : {
-          NOT: { status: "closed", dismissedAt: { not: null } },
-        },
+  const all = await prisma.coopPosting.findMany({
     include: { saved: true },
     orderBy: sort === "recent" ? { firstSeenAt: "desc" } : undefined,
   });
+  const postings = showClosed ? all : all.filter((p) => isPostingApplicable(p));
 
   if (sort === "deadline") {
     postings.sort((a, b) => {
@@ -37,6 +34,15 @@ export function getPosting(id: string) {
 export function isNewPosting(posting: CoopPosting, now: Date = new Date()): boolean {
   if (posting.origin !== "fetched") return false;
   return now.getTime() - posting.firstSeenAt.getTime() < 72 * 60 * 60 * 1000;
+}
+
+/** Same rule the co-op page uses by default: not a confirmed closure, and the deadline hasn't passed. */
+export function isPostingApplicable(
+  posting: Pick<CoopPosting, "status" | "dismissedAt" | "deadline">,
+  now: Date = new Date(),
+): boolean {
+  if (posting.status === "closed" && posting.dismissedAt != null) return false;
+  return !isPastDate(posting.deadline, now);
 }
 
 export function isPossiblyClosed(posting: CoopPosting): boolean {

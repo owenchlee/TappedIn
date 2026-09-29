@@ -1,6 +1,5 @@
 import "dotenv/config";
 import { defineConfig } from "prisma/config";
-import { resolveDatabaseUrl } from "./lib/dbUrl";
 
 export default defineConfig({
   schema: "prisma/schema.prisma",
@@ -8,6 +7,7 @@ export default defineConfig({
     path: "prisma/migrations",
   },
   datasource: {
-    url: resolveDatabaseUrl(process.env["DATABASE_URL"]),
+    // Migrations prefer the direct (unpooled) URL when one is provided, e.g. by Neon on Vercel.
+    url: process.env["DATABASE_URL_UNPOOLED"] ?? process.env["DATABASE_URL"] ?? "",
   },
 });

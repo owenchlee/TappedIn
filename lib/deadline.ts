@@ -86,3 +86,8 @@ export function dateInputToStorage(dateStr: string): Date {
 export function storageToDateInput(date: Date): string {
   return toCalendarDateString(date);
 }
+
+/** True once the given date's Toronto calendar day is over — a deadline of today is still live. */
+export function isPastDate(date: Date | null | undefined, now: Date = new Date()): boolean {
+  return date != null && daysUntil(date, now) < 0;
+}
