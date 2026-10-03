@@ -8,6 +8,7 @@ import { prisma } from "@/lib/db";
 import { createJob, jobDir, readJob, writeCommand, writeJob, type Job, type JobCommand } from "@/lib/autoapply/job";
 import { isResumeBase, type ResumeBase } from "@/lib/autoapply/base";
 import { setStage, trackPosting } from "@/actions/applications";
+import { findOrCreateManualPosting } from "@/lib/postings";
 import { toggleSave } from "@/actions/saved";
 import type { OrgKind } from "@/lib/types";
 
@@ -112,6 +113,12 @@ export async function markAutoApplySubmitted(jobId: string): Promise<string | nu
   let savedId: string | null = null;
   if (job.source.kind === "coop" && job.source.id !== "manual") {
     savedId = await trackPosting(job.source.id, "applied");
+  } else if (job.source.kind === "coop") {
+    // A pasted link isn't in the Jobs list yet: add it (or reuse the same job if it's already
+    // there under another source) so the application still shows up under Applied.
+    const posting = await findOrCreateManualPosting({ company: job.company, role: job.role, url: job.url });
+    savedId = await trackPosting(posting.id, "applied");
+    await prisma.savedItem.update({ where: { id: savedId }, data: { channel: "direct" } });
   } else if (job.source.kind === "org") {
     const org = await prisma.organization.findUniqueOrThrow({ where: { id: job.source.id }, select: { kind: true } });
     let saved = await prisma.savedItem.findUnique({ where: { organizationId: job.source.id }, select: { id: true } });
