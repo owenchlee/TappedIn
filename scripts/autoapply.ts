@@ -15,7 +15,7 @@ import { copyFileSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSyn
 import path from "node:path";
 import { chromium, type BrowserContext, type Page } from "playwright-core";
 import { PRIVATE_DIR, createJob, jobDir, readJob, writeJob, type FieldReport, type Job, type JobCommand, type StepName, type StepState } from "../lib/autoapply/job";
-import { bodyProblems, compileTex, enforcePreamble } from "../lib/autoapply/latex";
+import { bodyProblems, compileTex, enforcePreamble, fontsFromLog } from "../lib/autoapply/latex";
 import { factProblems, letterNumberProblems } from "../lib/autoapply/facts";
 import { runClaude, usedHumanizer } from "../lib/autoapply/claude";
 import { answersPrompt, coverLetterPrompt, letterFixPrompt, fixPrompt, humanizeRetryPrompt, problemsPrompt, tailorPrompt, trimPrompt } from "../lib/autoapply/prompts";
@@ -188,6 +188,12 @@ async function tailorResume(fields: FormField[], profile: Profile) {
     experienceMd: read("experience.md"),
   };
 
+  // The base compiled the way Overleaf compiles it: the tailored resume must not use any font face or
+  // size the original doesn't (e.g. a \small slipped in to squeeze onto one page).
+  const baseCompile = await compileTex(dir, `${job.resumeBase}.tex`);
+  const baseFonts = baseCompile.ok ? fontsFromLog(dir, `${job.resumeBase}.tex`) : null;
+  if (!baseFonts) log("Couldn't compile the base resume for the font check; skipping it");
+
   for (let attempt = 0; attempt < 4; attempt++) {
     const { tex, restored } = enforcePreamble(baseTex, read("resume.tex"));
     if (restored) {
@@ -200,7 +206,15 @@ async function tailorResume(fields: FormField[], profile: Profile) {
     let followUp: string | null = null;
     if (!compiled.ok) followUp = fixPrompt(compiled.error ?? "unknown error");
     else if ((compiled.pages ?? 1) > 1) followUp = trimPrompt(compiled.pages!);
-    else if (problems.length) followUp = problemsPrompt(problems);
+    else {
+      const extra = baseFonts?.size ? [...fontsFromLog(dir, "resume.tex")].filter((f) => !baseFonts.has(f)) : [];
+      if (extra.length) {
+        problems.push(
+          `uses font sizes or styles the original resume doesn't (${extra.join(", ")}); remove any size or font command (such as \\small, \\footnotesize, \\scriptsize) that the base doesn't have`,
+        );
+      }
+      if (problems.length) followUp = problemsPrompt(problems);
+    }
 
     if (!followUp) {
       mkdirSync(path.join(dir, "upload"), { recursive: true });

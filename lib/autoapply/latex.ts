@@ -86,3 +86,12 @@ export function extractHeader(baseTex: string): string | null {
 export function readText(file: string): string {
   return readFileSync(file, "utf8");
 }
+
+/** The Type 1 fonts pdfTeX embedded, read from the compile log ("<.../sfrm1000.pfb>"). Each file is one face at one size. */
+export function fontsFromLog(dir: string, texFile: string): Set<string> {
+  const log = path.join(dir, texFile.replace(/\.tex$/, ".log"));
+  if (!existsSync(log)) return new Set();
+  // pdfTeX hard-wraps its log at 79 columns, which can split a font path; unwrap first.
+  const text = readFileSync(log, "utf8").replace(/\r?\n/g, "");
+  return new Set([...text.matchAll(/([A-Za-z0-9-]+)\.pfb/g)].map((m) => m[1]));
+}
