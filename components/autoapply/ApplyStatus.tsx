@@ -8,8 +8,9 @@ import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { SectionTitle } from "@/components/ui/PageHeader";
-import { markAutoApplySubmitted, reopenAutoApply, sendApplyCommand } from "@/actions/apply";
+import { markAutoApplySubmitted, rebaseAutoApply, reopenAutoApply, sendApplyCommand } from "@/actions/apply";
 import type { Job, StepName, StepState } from "@/lib/autoapply/job";
+import { BASE_BADGE, RESUME_BASES, RESUME_BASE_LABELS } from "@/lib/autoapply/base";
 
 const STEP_LABELS: Record<StepName, string> = {
   open: "Open the posting in Chrome",
@@ -70,6 +71,7 @@ export function ApplyStatus({ initial }: { initial: Job }) {
   };
 
   const resumeReady = job.steps.tailor.state === "done";
+  const base = job.resumeBase ?? "software";
   const coverReady = Boolean(job.coverLetter?.needed) && job.steps.cover_letter.state !== "running" && job.steps.cover_letter.state !== "pending";
   const browserOpen = job.status !== "closed";
   const needsYou = (job.fields ?? []).filter((f) => !f.filled);
@@ -147,13 +149,35 @@ export function ApplyStatus({ initial }: { initial: Job }) {
           <div className="grid gap-3 sm:grid-cols-2">
             {resumeReady && (
               <Card className="space-y-2">
-                <p className="flex items-center gap-1.5 text-sm font-medium text-text"><FileText className="size-4" /> Resume</p>
-                <p className="text-xs text-muted">Based on your {job.resumeBase ?? "software"} resume. Same Overleaf template and preamble, one page.</p>
+                <p className="flex flex-wrap items-center gap-1.5 text-sm font-medium text-text">
+                  <FileText className="size-4" /> Resume
+                  <Badge variant={BASE_BADGE[base]}>{RESUME_BASE_LABELS[base]} base</Badge>
+                </p>
+                <p className="text-xs text-muted">{job.baseReason ?? `Tailored from your ${RESUME_BASE_LABELS[base].toLowerCase()} resume.`}</p>
+                {job.baseCheck && !job.baseCheck.agrees && job.baseCheck.titleSuggests && (
+                  <p className="rounded-md bg-amber/12 px-2 py-1.5 text-xs text-amber">
+                    The job title looks like a {RESUME_BASE_LABELS[job.baseCheck.titleSuggests].toLowerCase()} role, but this used your{" "}
+                    {RESUME_BASE_LABELS[base].toLowerCase()} resume. Check it&apos;s the right one.
+                  </p>
+                )}
                 <div className="flex flex-wrap gap-2">
                   <a className="text-xs font-medium text-accent hover:underline" href={file("resume.pdf")} target="_blank" rel="noreferrer">View PDF</a>
                   <a className="text-xs font-medium text-accent hover:underline" href={`${file("resume.tex")}?download`}>Download .tex</a>
                   <button type="button" className="text-xs font-medium text-accent hover:underline" onClick={openInOverleaf}>Open in Overleaf</button>
                 </div>
+                {job.status !== "running" && (
+                  <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted">
+                    Redo from:
+                    {RESUME_BASES.filter((b) => b !== base).map((b) => (
+                      <button key={b} type="button" disabled={isPending} className="font-medium text-accent hover:underline disabled:opacity-50" onClick={() => run(async () => {
+                        await rebaseAutoApply(job.id, b);
+                        setJob((j) => ({ ...j, status: "running" }));
+                      })}>
+                        {RESUME_BASE_LABELS[b].toLowerCase()} resume
+                      </button>
+                    ))}
+                  </p>
+                )}
               </Card>
             )}
             <Card className="space-y-2">

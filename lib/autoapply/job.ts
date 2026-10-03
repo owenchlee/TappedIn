@@ -1,5 +1,6 @@
 import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, writeFileSync } from "node:fs";
 import path from "node:path";
+import type { ResumeBase } from "./base";
 
 // Shared between the Next.js app and the detached runner (scripts/autoapply.ts), so this module
 // must stay free of Next and Prisma imports. The runner owns job.json once it starts; the app only
@@ -26,7 +27,13 @@ export type Job = {
   url: string;
   status: JobStatus;
   steps: Record<StepName, { state: StepState; detail?: string }>;
-  resumeBase?: "software" | "hardware";
+  resumeBase?: ResumeBase;
+  /** Claude's one-sentence reason for the pick (or "You chose this resume"). */
+  baseReason?: string;
+  /** Independent check from the job title; null when the title is too vague to judge. */
+  baseCheck?: { titleSuggests: ResumeBase | null; agrees: boolean };
+  /** Set when Owen overrides the pick; the next tailor run must use it. */
+  forcedBase?: ResumeBase;
   coverLetter?: { needed: boolean; reason: string; humanized?: boolean };
   tailorNotes?: string;
   fields?: FieldReport[];
@@ -37,7 +44,7 @@ export type Job = {
   log: { at: string; msg: string }[];
 };
 
-export type JobCommand = { command: "refill" | "cover" | "close"; at: string };
+export type JobCommand = { command: "refill" | "cover" | "close" | "rebase"; at: string; base?: ResumeBase };
 
 const ID_RE = /^[a-z0-9-]{8,80}$/;
 
@@ -107,9 +114,9 @@ export function listJobs(): Job[] {
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 }
 
-export function writeCommand(id: string, command: JobCommand["command"]): void {
+export function writeCommand(id: string, command: JobCommand["command"], base?: ResumeBase): void {
   const file = path.join(jobDir(id), "command.json");
-  writeFileSync(`${file}.tmp`, JSON.stringify({ command, at: new Date().toISOString() } satisfies JobCommand));
+  writeFileSync(`${file}.tmp`, JSON.stringify({ command, at: new Date().toISOString(), base } satisfies JobCommand));
   renameSync(`${file}.tmp`, file);
 }
 

@@ -1,5 +1,7 @@
 // Prompts for the headless Claude Code runs. Each run's cwd is the job folder, which holds:
-//   jd.txt, experience.md, software.tex, hardware.tex, questions.json (and resume.tex once written)
+//   jd.txt, experience.md, software.tex, hardware.tex, pm.tex, questions.json (and resume.tex once written)
+
+import type { ResumeBase } from "./base";
 
 const TRUTH_RULES = `Truthfulness is the hard rule. Every claim must be backed by experience.md. Never invent
 projects, numbers, tools, titles, dates, or responsibilities. Only use a keyword from the job
@@ -9,25 +11,35 @@ experience.md is under "Unconfirmed", do not use it.
 Style: plain, direct, specific. Never use em dashes (the "—" character or LaTeX "---"); use commas,
 periods, or parentheses instead.`;
 
-export function tailorPrompt(opts: { company: string; role: string }): string {
+function pickBaseStep(forced?: ResumeBase): string {
+  if (forced) return `1) Use ${forced}.tex as the base resume. Owen chose it himself, so do not second-guess it.`;
+  return `1) Pick the base resume from what the job mainly is, reading the posting, not just the title:
+- pm.tex: product management, product owner, APM, product analyst, program or project management,
+  or other non-coding roles where leading people, user feedback, and launches matter most.
+- hardware.tex: mainly hardware, embedded, electrical, firmware, PCB, or robotics hardware.
+- software.tex: everything else (software, web, mobile, data, ML, and engineering roles that are
+  mostly code).`;
+}
+
+export function tailorPrompt(opts: { company: string; role: string; forcedBase?: ResumeBase }): string {
   return `You are tailoring Owen Lee's resume for: ${opts.role} at ${opts.company}.
 
 Files in the current directory:
 - jd.txt: the job posting text scraped from the page
 - experience.md: everything true about Owen (source of truth)
-- software.tex and hardware.tex: his two Overleaf resumes (Jake's Resume template)
+- software.tex, hardware.tex and pm.tex: his three Overleaf resumes (Jake's Resume template); pm.tex is
+  his product management resume
 - questions.json: application-form questions that still need an answer
 
 Do these three things, then reply with just DONE.
 
-1) Pick the base resume. Use hardware.tex only if the role is mainly hardware, embedded, electrical,
-firmware, PCB, or robotics hardware. Otherwise use software.tex.
+${pickBaseStep(opts.forcedBase)}
 
 2) Write resume.tex: a copy of the chosen base with only the resume content edited to fit this job.
 - Everything before \\begin{document} must stay byte for byte identical. Keep the header block,
   the section order, and the template's commands (\\resumeProjectHeading, \\resumeItem, etc.).
-- It must still fit on ONE page. Keep the same number of projects or fewer, keep two bullets per
-  entry, and keep each bullet about as long as the one it replaces.
+- It must still fit on ONE page. Keep the same number of projects or fewer, keep the same number of
+  bullets per entry as the base, and keep each bullet about as long as the one it replaces.
 - Allowed edits: reorder projects so the most relevant come first; swap a less relevant project
   for a more relevant one from experience.md; rephrase bullets to use the posting's own vocabulary
   for things Owen actually did; reorder or adjust the Skills line (only skills backed by
@@ -46,8 +58,9 @@ firmware, PCB, or robotics hardware. Otherwise use software.tex.
   specific to this company, grounded in experience.md. If a free-text answer is longer than two
   sentences, run the humanizer skill (Skill tool) on it and use the humanized version.
 
-Also write notes.md. Its first line must be exactly "Base: software" or "Base: hardware". Then: why
-you picked that base; the posting's key requirements and how the
+Also write notes.md. Its first line must be exactly "Base: software", "Base: hardware" or "Base: pm".
+Its second line must be "Why: " followed by one plain sentence on why that base fits this job. Then:
+the posting's key requirements and how the
 resume now covers each; important keywords you could NOT add because Owen doesn't have them; a
 short list of what you changed.
 

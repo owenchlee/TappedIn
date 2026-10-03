@@ -6,6 +6,7 @@ import path from "node:path";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { createJob, jobDir, readJob, writeCommand, writeJob, type Job, type JobCommand } from "@/lib/autoapply/job";
+import { isResumeBase, type ResumeBase } from "@/lib/autoapply/base";
 import { setStage, trackPosting } from "@/actions/applications";
 import { toggleSave } from "@/actions/saved";
 import type { OrgKind } from "@/lib/types";
@@ -61,10 +62,31 @@ export async function startAutoApplyUrl(formData: FormData): Promise<string> {
   return start({ source: { kind: "coop", id: "manual" }, company, role, url });
 }
 
-export async function sendApplyCommand(jobId: string, command: JobCommand["command"]): Promise<void> {
+export async function sendApplyCommand(jobId: string, command: Exclude<JobCommand["command"], "rebase">): Promise<void> {
   assertEnabled();
   if (!readJob(jobId)) throw new Error("No such auto-apply job");
   writeCommand(jobId, command);
+}
+
+/**
+ * Owen overrides which resume the tailored one starts from. With the window still open the runner
+ * redoes the resume (and cover letter, if any) and re-fills; if it was closed, a fresh run starts.
+ */
+export async function rebaseAutoApply(jobId: string, base: ResumeBase): Promise<void> {
+  assertEnabled();
+  if (!isResumeBase(base)) throw new Error(`Unknown resume: ${String(base)}`);
+  const job = readJob(jobId);
+  if (!job) throw new Error("No such auto-apply job");
+  if (job.status === "running") throw new Error("Wait for the current step to finish first.");
+  if (job.status === "closed") {
+    job.forcedBase = base;
+    job.status = "running";
+    job.error = undefined;
+    writeJob(job);
+    spawnRunner(jobId);
+  } else {
+    writeCommand(jobId, "rebase", base);
+  }
 }
 
 /** The browser window was closed: open it again and re-fill, reusing the tailored documents. */

@@ -7,7 +7,7 @@
  * Opens the posting in a real Chrome window right away, tailors the resume (LaTeX, compiled with
  * pdfLaTeX so it matches Overleaf), writes a cover letter only when the application needs one,
  * fills the form, and then stops. It never clicks Submit. It stays alive until the window is
- * closed, listening for commands the app drops into command.json (refill / cover / close).
+ * closed, listening for commands the app drops into command.json (refill / cover / rebase / close).
  *
  * Lives outside Next's bundle on purpose: Playwright and the `claude` CLI only exist locally.
  */
@@ -21,6 +21,7 @@ import { answersPrompt, coverLetterPrompt, fixPrompt, humanizeRetryPrompt, probl
 import { fillField, hasApplicationForm, pageText, scanPage, type FormField } from "../lib/autoapply/form";
 import { mapField, type Profile } from "../lib/autoapply/profileMap";
 import { coverLetterTex } from "../lib/autoapply/coverLetterTex";
+import { RESUME_BASES, RESUME_BASE_LABELS, baseFromTitle, isResumeBase, parseBaseLine, parseWhyLine } from "../lib/autoapply/base";
 
 const TEMPLATES_DIR = path.join(PRIVATE_DIR, "resume", "templates");
 const BROWSER_PROFILE = path.join(PRIVATE_DIR, "browser-profile");
@@ -166,8 +167,20 @@ async function tailorResume(fields: FormField[], profile: Profile) {
   mergeAnswers(questions);
 
   const notes = has("notes.md") ? read("notes.md") : "";
-  job.resumeBase = /^Base:\s*hardware/im.test(notes) ? "hardware" : "software";
-  job.tailorNotes = notes.replace(/^Base:.*\n?/i, "").trim();
+  const picked = parseBaseLine(notes);
+  const titleSuggests = baseFromTitle(job.role);
+  if (job.forcedBase) {
+    job.resumeBase = job.forcedBase;
+    job.baseReason = "You chose this resume.";
+  } else {
+    job.resumeBase = picked ?? titleSuggests ?? "software";
+    job.baseReason = parseWhyLine(notes) ?? (picked ? undefined : "Claude didn't name a base, so the job title decided.");
+  }
+  // Second opinion from the title alone, so a wrong pick is flagged instead of silently used.
+  // Owen's own override is never flagged.
+  job.baseCheck = { titleSuggests, agrees: job.forcedBase != null || titleSuggests == null || titleSuggests === job.resumeBase };
+  log(`Base resume: ${job.resumeBase}${job.forcedBase ? " (your choice)" : ""}; title suggests ${titleSuggests ?? "nothing clear"}`);
+  job.tailorNotes = notes.replace(/^Base:.*\n?/im, "").replace(/^Why:.*\n?/im, "").trim();
   const baseTex = readFileSync(path.join(TEMPLATES_DIR, `${job.resumeBase}.tex`), "utf8");
 
   for (let attempt = 0; attempt < 4; attempt++) {
@@ -186,7 +199,7 @@ async function tailorResume(fields: FormField[], profile: Profile) {
     if (!followUp) {
       mkdirSync(path.join(dir, "upload"), { recursive: true });
       copyFileSync(path.join(dir, "resume.pdf"), path.join(dir, "upload", RESUME_UPLOAD_NAME));
-      step("tailor", "done", `One page, based on your ${job.resumeBase} resume`);
+      step("tailor", "done", `One page, based on your ${RESUME_BASE_LABELS[job.resumeBase].toLowerCase()} resume`);
       return;
     }
     log(`resume check failed (${!compiled.ok ? "compile error" : compiled.pages! > 1 ? `${compiled.pages} pages` : problems.join(", ")}); asking Claude to fix`);
@@ -314,7 +327,9 @@ async function main() {
 
   const profile = JSON.parse(readFileSync(path.join(PRIVATE_DIR, "profile.json"), "utf8")) as Profile;
   copyFileSync(path.join(PRIVATE_DIR, "experience.md"), path.join(dir, "experience.md"));
-  for (const t of ["software.tex", "hardware.tex"]) copyFileSync(path.join(TEMPLATES_DIR, t), path.join(dir, t));
+  for (const b of RESUME_BASES) copyFileSync(path.join(TEMPLATES_DIR, `${b}.tex`), path.join(dir, `${b}.tex`));
+  // A full run rebuilds the documents (e.g. after Owen picked a different base while the window was closed).
+  if (!fillOnly) rmSync(path.join(dir, "upload"), { recursive: true, force: true });
 
   step("open", "running", "Opening the posting in Chrome");
   const { context, page: first } = await launch();
@@ -379,6 +394,15 @@ async function main() {
         await writeCoverLetter();
         const fields = await scanPage(page);
         await fillPage(page, fields, profile);
+      } else if (cmd.command === "rebase" && isResumeBase(cmd.base)) {
+        job.forcedBase = cmd.base;
+        job.status = "running";
+        log(`Redoing the resume from your ${RESUME_BASE_LABELS[cmd.base].toLowerCase()} resume`);
+        for (const f of ["resume.tex", "notes.md", `upload/${RESUME_UPLOAD_NAME}`]) rmSync(path.join(dir, f), { force: true });
+        await tailorResume(await scanPage(page), profile);
+        if (job.coverLetter?.needed) await writeCoverLetter(); // the letter complements the resume, so redo it too
+        await fillPage(page, await scanPage(page), profile);
+        job.status = "ready";
       } else if (cmd.command === "refill") {
         log(`Re-filling ${page.url()}`);
         const fields = await scanPage(page);
@@ -388,7 +412,13 @@ async function main() {
       if (job.status === "failed" && has(`upload/${RESUME_UPLOAD_NAME}`)) job.status = "ready";
       writeJob(job);
     } catch (err) {
-      log(`Command ${cmd.command} failed: ${err instanceof Error ? err.message : String(err)}`);
+      const msg = err instanceof Error ? err.message : String(err);
+      if (job.status === "running") {
+        job.status = "failed";
+        job.error = msg;
+        for (const name of Object.keys(job.steps) as StepName[]) if (job.steps[name].state === "running") job.steps[name].state = "failed";
+      }
+      log(`Command ${cmd.command} failed: ${msg}`);
     }
   }
 

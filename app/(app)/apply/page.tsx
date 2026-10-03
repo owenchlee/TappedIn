@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { listJobs, type Job } from "@/lib/autoapply/job";
+import { BASE_BADGE, RESUME_BASE_LABELS } from "@/lib/autoapply/base";
 import { PageHeader, SectionTitle } from "@/components/ui/PageHeader";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
@@ -52,6 +53,12 @@ export default function AutoApplyPage() {
                   </p>
                 </div>
                 <div className="flex shrink-0 items-center gap-1.5">
+                  {j.resumeBase && (
+                    <Badge variant={j.baseCheck?.agrees === false ? "amber" : BASE_BADGE[j.resumeBase]}>
+                      {RESUME_BASE_LABELS[j.resumeBase]}
+                      {j.baseCheck?.agrees === false && " (check)"}
+                    </Badge>
+                  )}
                   {j.submittedAt && <Badge variant="emerald">Submitted</Badge>}
                   <Badge variant={STATUS[j.status].variant}>{STATUS[j.status].label}</Badge>
                 </div>

@@ -59,7 +59,7 @@ export function mapField(
   const v = (value: string | boolean | null | undefined): Mapped =>
     // A recognized personal field that's blank in profile.json is Owen's to fill, never the model's.
     value === "" || value == null
-      ? { kind: "needs_owen", reason: `"${field.label}" is blank in private/profile.json` }
+      ? { kind: "needs_owen", reason: `"${field.label}" is blank on your Profile page` }
       : { kind: "value", value };
 
   if (field.kind === "file") {
@@ -74,14 +74,14 @@ export function mapField(
   // Sensitive: only ever answered from profile.json, never guessed by the model.
   if (/sponsor|visa/.test(l)) {
     return p.requiresSponsorship == null
-      ? { kind: "needs_owen", reason: "sponsorship: set requiresSponsorship in private/profile.json" }
+      ? { kind: "needs_owen", reason: "Sponsorship: answer it on your Profile page" }
       : { kind: "value", value: yesNo(p.requiresSponsorship) };
   }
   if (/authori[sz]|legally (eligible|able|permitted)|eligible to work|right to work|work permit/.test(l)) {
     const us = /\b(us|u\.s\.|united states|america)\b/.test(l);
     const val = us ? p.authorizedToWorkInUS : p.authorizedToWorkInCanada;
     return val == null
-      ? { kind: "needs_owen", reason: `work authorization (${us ? "US" : "Canada"}): set it in private/profile.json` }
+      ? { kind: "needs_owen", reason: `Work authorization (${us ? "US" : "Canada"}): answer it on your Profile page` }
       : { kind: "value", value: yesNo(val) };
   }
   const eeo: [RegExp, string][] = [

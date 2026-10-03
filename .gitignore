@@ -55,3 +55,6 @@ next-env.d.ts
 
 .vercel
 .env*
+
+# Terminal Paste Image folder
+.cp-images/

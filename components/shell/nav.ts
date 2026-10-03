@@ -10,6 +10,7 @@ import {
   Settings,
   Trophy,
   UsersRound,
+  UserRound,
   Contact,
   Wand2,
   type LucideIcon,
@@ -43,7 +44,12 @@ export function navSections(opts: { autoApply: boolean }): NavSection[] {
         { href: "/contacts", label: "Contacts", icon: Contact },
         { href: "/journey", label: "Journey", icon: Route },
         { href: "/insights", label: "Insights", icon: BarChart3 },
-        ...(opts.autoApply ? [{ href: "/apply", label: "Auto-apply", icon: Wand2 }] : []),
+        ...(opts.autoApply
+          ? [
+              { href: "/apply", label: "Auto-apply", icon: Wand2 },
+              { href: "/profile", label: "Profile", icon: UserRound },
+            ]
+          : []),
       ],
     },
     {
