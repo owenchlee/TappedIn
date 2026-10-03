@@ -39,6 +39,20 @@ describe("regions", () => {
     expect(regionForLocation("London, UK")).toBe("intl");
   });
 
+  it("recognizes Simplify's short US locations instead of dropping them as international", () => {
+    for (const loc of ["SF", "South SF", "LA", "NYC", "Minnesota", "Texas", "California"]) {
+      expect(regionForLocation(loc)).toBe("us");
+    }
+    expect(regionForLocation("Las Vegas")).toBe("intl"); // no false hit on "la" inside a word
+  });
+
+  it("lets a US state code beat a Canadian city name", () => {
+    expect(regionForLocation("Hamilton, NJ")).toBe("us");
+    expect(regionForLocation("New Brunswick, NJ")).toBe("us");
+    expect(regionForLocation("London, ON")).toBe("canada");
+    expect(regionForLocation("Hamilton")).toBe("canada");
+  });
+
   it("prefers Canada when a posting lists several locations", () => {
     expect(regionForLocations(["New York, NY", "Toronto, ON"])).toBe("canada");
   });

@@ -81,18 +81,34 @@ const US_RE = new RegExp(
   `,\\s*(${US_STATES})\\b|\\b(united states|usa|u\\.s\\.)\\b|\\b(new york|san francisco|seattle|boston|chicago|austin|los angeles|palo alto|mountain view|menlo park|sunnyvale|san jose|bay area|nyc)\\b`,
   "i",
 );
+// Simplify writes many US locations as bare abbreviations ("SF", "LA", "South SF") or state names.
+// Case-sensitive on purpose: "la"/"sf" inside other words or lowercase text must not match.
+const US_ABBREV_RE = /\b(SF|LA|NYC|DC|SoCal|NorCal)\b/;
+const US_STATE_NAMES_RE =
+  /\b(alabama|alaska|arizona|arkansas|california|colorado|connecticut|delaware|florida|georgia|hawaii|idaho|illinois|indiana|iowa|kansas|kentucky|louisiana|maine|maryland|massachusetts|michigan|minnesota|mississippi|missouri|montana|nebraska|nevada|new hampshire|new jersey|new mexico|north carolina|north dakota|ohio|oklahoma|oregon|pennsylvania|rhode island|south carolina|south dakota|tennessee|texas|utah|vermont|virginia|washington|west virginia|wisconsin|wyoming)\b/i;
+// "City, ST" with a US state code is unambiguous, so it beats Canadian city names ("Hamilton, NJ",
+// "New Brunswick, NJ", "London, KY").
+const US_STATE_CODE_RE = new RegExp(`,\\s*(${US_STATES})\\b`);
+const CA_PROVINCE_CODE_RE = new RegExp(`,\\s*(${CA_PROVINCES})\\b`);
 const REMOTE_RE = /\bremote\b|\banywhere\b|\bwork from home\b/i;
+
+function isUs(location: string): boolean {
+  return US_RE.test(location) || US_ABBREV_RE.test(location) || US_STATE_NAMES_RE.test(location);
+}
 
 export function regionForLocation(location: string | null | undefined): Region | null {
   if (!location) return null;
   // One posting can list several locations; Canada wins, then remote, then US.
-  if (CA_RE.test(location)) return "canada";
+  const explicitCanada = /\bcanada\b/i.test(location) || CA_PROVINCE_CODE_RE.test(location);
+  if (explicitCanada) return "canada";
   if (REMOTE_RE.test(location)) {
     // "Remote in USA" is still a US job for someone who needs Canadian work eligibility.
-    if (US_RE.test(location) && !/canada/i.test(location)) return "us";
+    if (isUs(location)) return "us";
     return "remote";
   }
-  if (US_RE.test(location)) return "us";
+  if (US_STATE_CODE_RE.test(location)) return "us";
+  if (CA_RE.test(location)) return "canada";
+  if (isUs(location)) return "us";
   return "intl";
 }
 

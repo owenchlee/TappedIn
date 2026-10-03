@@ -5,11 +5,10 @@ import { getAdapter } from "@/lib/sources/adapters";
 import { applyMatch } from "@/lib/sources/filter";
 import { diffPostings } from "@/lib/sources/diff";
 import { applyDiff, type ExistingPostingMeta } from "@/lib/sources/apply";
-import { categoryFromTitle, regionForLocation } from "@/lib/sources/normalize";
-import { termsFromText } from "@/lib/terms";
+import { enrich } from "@/lib/sources/enrich";
 import { importMlhHackathons, type HackathonImportSummary } from "@/lib/hackathons/mlh";
 import { runOrgWatch, type OrgWatchSummary } from "@/lib/watch/orgWatch";
-import type { LoadedSource, RawPosting } from "@/lib/sources/types";
+import type { LoadedSource } from "@/lib/sources/types";
 
 export const JOB_KEY = "daily-refresh";
 
@@ -31,6 +30,8 @@ async function withRefreshLock<T>(fn: () => Promise<T>): Promise<T> {
   }
 }
 
+export { enrich };
+
 export type SourceRunSummary = {
   sourceKey: string;
   ok: boolean;
@@ -40,16 +41,6 @@ export type SourceRunSummary = {
   duplicates?: number;
   error?: string;
 };
-
-/** Fills the facets a source didn't provide (term, region, category) from the title and location. */
-export function enrich(p: RawPosting): RawPosting {
-  return {
-    ...p,
-    terms: p.terms && p.terms.length > 0 ? p.terms : termsFromText(p.title),
-    region: p.region ?? regionForLocation(p.location) ?? undefined,
-    category: p.category ?? categoryFromTitle(p.title),
-  };
-}
 
 async function runOneSource(source: LoadedSource): Promise<SourceRunSummary> {
   const run = await prisma.sourceRun.create({ data: { sourceKey: source.key } });
