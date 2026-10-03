@@ -1,4 +1,4 @@
-import { bestOption, type FillValue, type FormField } from "./form";
+import { DECLINE_RE, bestOption, type FillValue, type FormField } from "./form";
 
 export type Profile = {
   firstName: string;
@@ -104,11 +104,25 @@ export function mapField(
   for (const [re, pref] of eeo) {
     if (re.test(l)) {
       if (pref !== "decline") return v(pref);
-      const opt = field.options?.find((o) => /decline|don.?t wish|prefer not|not to (say|answer|disclose|self)|choose not/i.test(o));
+      const opt = field.options?.find((o) => DECLINE_RE.test(o));
       return { kind: "value", value: opt ?? DECLINE };
     }
   }
+  // Also Owen's alone, and not in his profile: never handed to the model either.
+  const SENSITIVE: [RegExp, string][] = [
+    [/citizen|export control|\bitar\b|security clearance|u\.s\. person|eligibility status|immigration|work status/, "Citizenship / export control"],
+    [/salary|compensation|pay (expectation|rate|range)|desired (pay|rate|wage)|hourly rate|expected (pay|rate|wage)/, "Pay expectations"],
+    [/\bgpa\b|grade point|cumulative average/, "GPA"],
+    [/criminal|convict|felony|background check/, "Background check"],
+  ];
+  for (const [re, what] of SENSITIVE) if (re.test(l)) return { kind: "needs_owen", reason: `${what}: answer it yourself` };
 
+  // Below are personal fields. A checkbox ("New York City - 1 World Trade") or a yes/no question
+  // ("Will you be returning to school...?") that mentions one is not asking for that value.
+  if (field.kind === "checkbox" || /^(are|do|does|did|have|has|will|would|can|could|is|were)\b/.test(l)) return { kind: "unmapped" };
+
+  // Lever: "Name Pronunciation", "High School Name". Not the name or school the profile holds.
+  if (/pronounc|high school|secondary school/.test(l)) return { kind: "unmapped" };
   if (/preferred (first )?name|nickname/.test(l)) return v(p.preferredName);
   if (/first name|given name|legal first/.test(l)) return v(p.firstName);
   if (/last name|family name|surname|legal last/.test(l)) return v(p.lastName);
@@ -116,20 +130,23 @@ export function mapField(
   if (/e-?mail/.test(l)) return v(p.email);
   if (/phone|mobile|cell/.test(l)) return v(p.phone);
   if (/linkedin/.test(l)) return v(p.linkedin);
-  if (/github/.test(l)) return v(p.github);
+  if (/github/.test(l)) return v(/username|handle/.test(l) ? (p.github.replace(/\/+$/, "").split("/").pop() ?? "") : p.github);
   if (/website|portfolio|personal (site|url)|other (link|url)/.test(l)) return v(p.website);
   if (/pronoun/.test(l)) return v(p.pronouns);
-  if (/school|university|college|institution/.test(l)) return v(p.school);
+  if (/^(school|university|college|institution)( name)?$|(school|university|college|institution) name|name of (your )?(school|university|college|institution)|(which|what|current) (school|university|college|institution)/.test(l))
+    return v(p.school);
   if (/degree/.test(l)) return v(p.degree);
   if (/discipline|major|field of study|program of study|program\b/.test(l)) return v(p.program);
-  if (/graduat|expected (completion|end)/.test(l)) return v(monthYear(p.graduationDate));
+  if (/graduat|expected (completion|end)/.test(l)) return v(/\byear\b/.test(l) ? p.graduationDate.slice(0, 4) : monthYear(p.graduationDate));
   if (/postal|zip/.test(l)) return v(p.postalCode);
   if (/address/.test(l)) return v(p.addressLine1);
   if (/\bcity\b/.test(l)) return v(p.city);
   // Not a bare /state/: "Please state why..." is a free-text question, not an address field.
   if (/\bprovince\b|^state\b|\bstate\s*(\/|or)\s*province|\b(home|current) state\b/.test(l)) return v(p.province);
   if (/country/.test(l)) return v(p.country);
-  if (/location|where are you (based|located)|current(ly)? (located|residing)/.test(l)) return v(`${p.city}, ${p.province}, ${p.country}`);
+  // "Location preference" / "Which office..." asks where he'd work, not where he lives.
+  if (/location|where are you (based|located)|current(ly)? (located|residing)/.test(l) && !/prefer|office|which|willing|relocat|hub|site/.test(l))
+    return v(`${p.city}, ${p.province}, ${p.country}`);
   if (/how did you (hear|find|learn)|^(application |candidate )?source$|referr(al|ed) by/.test(l)) {
     if (/referr/.test(l)) return { kind: "unmapped" };
     const opt = field.options && (field.options.find((o) => /career|company (web)?site|job (board|posting)/i.test(o)) ?? field.options.find((o) => /other/i.test(o)));

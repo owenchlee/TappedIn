@@ -75,3 +75,34 @@ describe("other fields", () => {
     expect(m).toEqual({ kind: "value", value: "Decline to self-identify" });
   });
 });
+
+describe("questions seen on live Greenhouse / Ashby / Lever forms (Oct 2026)", () => {
+  const combo = { kind: "combobox" as const };
+  it("keeps sensitive questions away from both the profile and the model", () => {
+    for (const label of [
+      "For your most recent degree, what is/was your GPA (normalized to a 4.0 scale)?",
+      "EXPORT CONTROLS - This position requires access to information that is subject to U.S. export controls",
+      "Employment eligibility status",
+      "What are your annualized total compensation expectations?",
+    ]) {
+      expect(mapField(field(label, combo), profile, files).kind, label).toBe("needs_owen");
+    }
+  });
+
+  it("doesn't answer yes/no questions or checkboxes with a personal field", () => {
+    expect(mapField(field("Will you be returning to school at the end of the internship?", combo), profile, files).kind).toBe("unmapped");
+    expect(mapField(field("New York City - 1 World Trade", { kind: "checkbox" }), profile, files).kind).toBe("unmapped");
+    expect(mapField(field("What is your top location preference?", combo), profile, files).kind).toBe("unmapped");
+    expect(mapField(field("Name Pronunciation | How do you pronounce your name?"), profile, files).kind).toBe("unmapped");
+    expect(mapField(field("High School Name", { kind: "textarea" }), profile, files).kind).toBe("unmapped");
+  });
+
+  it("still maps the plain fields", () => {
+    expect(mapField(field("School", combo), profile, files)).toEqual({ kind: "value", value: "University of Waterloo" });
+    expect(mapField(field("Current Location"), profile, files)).toEqual({ kind: "value", value: "Waterloo, Ontario, Canada" });
+    expect(mapField(field("What year are you expected to graduate?", combo), profile, files)).toEqual({ kind: "value", value: "2031" });
+    const withGh = { ...profile, github: "https://github.com/someone/" };
+    expect(mapField(field("What is your Github username?"), withGh, files)).toEqual({ kind: "value", value: "someone" });
+    expect(mapField(field("Resume/CV", { kind: "file" }), profile, files)).toEqual({ kind: "value", value: { file: "r.pdf" } });
+  });
+});

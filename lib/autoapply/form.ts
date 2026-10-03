@@ -76,6 +76,9 @@ function scanFrame(frameIdx: number): FormField[] {
     if (tag === "input" && ["hidden", "submit", "button", "reset", "image", "password", "search"].includes(type)) continue;
     // File inputs are usually hidden behind a styled "Attach" button, so they skip the visibility check.
     if (type !== "file" && !visible(el)) continue;
+    // react-select (Greenhouse's new boards) pairs every dropdown with an invisible aria-hidden
+    // "required" twin. Typing into it would look filled while the real dropdown stays empty.
+    if (type !== "file" && el.closest("[aria-hidden=true]")) continue;
 
     if (tag === "input" && type === "radio") {
       const name = el.getAttribute("name") ?? `__radio${n}`;
@@ -83,7 +86,14 @@ function scanFrame(frameIdx: number): FormField[] {
       continue;
     }
 
-    const rawLabel = labelOf(el);
+    let rawLabel = labelOf(el);
+    // Upload widgets label the input after the button ("Attach", "Upload"); the id/name says what it is
+    // (Greenhouse: id="resume" / id="cover_letter").
+    if (type === "file" && /^(attach|upload|browse|choose( a)? file|select( a)? file|drop .*|)$/i.test(noStar(rawLabel))) {
+      const hint = `${el.id} ${el.getAttribute("name") ?? ""}`.toLowerCase();
+      if (/cover/.test(hint)) rawLabel = "Cover Letter";
+      else if (/resume|\bcv\b/.test(hint)) rawLabel = "Resume/CV";
+    }
     const label = noStar(rawLabel);
     if (/password/i.test(label)) continue;
 
@@ -161,15 +171,38 @@ function norm(s: string) {
   return s.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
 }
 
-export function bestOption(options: string[], wanted: string): string | null {
+/** Every way ATSes word "I'd rather not say" on self-identification questions. */
+export const DECLINE_RE = /decline|don.?t wish|do not wish|prefer not|not to (say|answer|disclose|self)|choose not|do not want|don.?t want/i;
+
+// Same meaning, different wording: the profile says "Bachelor of Applied Science (BASc)", the
+// dropdown says "Bachelor's Degree".
+// anyOf: several hits all mean the same thing ("Bachelors" / "Bachelor's Degree"), so take the first.
+const INTENTS: { wanted: RegExp; option: RegExp; anyOf?: boolean }[] = [
+  { wanted: DECLINE_RE, option: DECLINE_RE, anyOf: true },
+  { wanted: /\bbachelor/i, option: /\bbachelor/i, anyOf: true },
+  { wanted: /\bmaster/i, option: /\bmaster(?!.*business)/i, anyOf: true },
+  { wanted: /career|company (web)?site/i, option: /careers? (page|site)|company (web)?site|\bwebsite\b/i },
+];
+
+/** strict: exact or prefix matches only (used before trying a search query). */
+export function bestOption(options: string[], wanted: string, strict = false): string | null {
   const w = norm(wanted);
   if (!w) return null;
-  return (
-    options.find((o) => norm(o) === w) ??
-    options.find((o) => norm(o).startsWith(w) || w.startsWith(norm(o))) ??
-    options.find((o) => norm(o).includes(w) || w.includes(norm(o))) ??
-    null
-  );
+  const found =
+    options.find((o) => norm(o) === w) ?? options.find((o) => norm(o) && (norm(o).startsWith(w) || w.startsWith(norm(o))));
+  if (found || strict) return found ?? null;
+  // Containment only for real words ("No" must not match inside a longer answer), and the most
+  // specific option wins: "Systems Design Engineering" over "Engineering".
+  const contained = options
+    .filter((o) => norm(o).length >= 4 && (norm(o).includes(w) || w.includes(norm(o))))
+    .sort((a, b) => norm(b).length - norm(a).length);
+  if (contained.length) return contained[0];
+  for (const intent of INTENTS) {
+    if (!intent.wanted.test(wanted)) continue;
+    const hits = options.filter((o) => intent.option.test(o));
+    if (hits.length === 1 || (hits.length > 1 && intent.anyOf)) return hits[0];
+  }
+  return null;
 }
 
 export type FillValue = string | boolean | { file: string };
@@ -220,16 +253,44 @@ export async function fillField(page: Page, field: FormField, value: FillValue):
     }
     case "combobox": {
       if (typeof value !== "string" || !value) return null;
+      const listed = () =>
+        frame
+          .getByRole("option")
+          .allInnerTexts()
+          .then((all) => all.map((t) => t.replace(/\s+/g, " ").trim()).filter(Boolean))
+          .catch(() => [] as string[]);
+      const waitForMatch = async (ms: number, strict = false) => {
+        for (let waited = 0; waited <= ms; waited += 250) {
+          const match = bestOption(await listed(), value, strict);
+          if (match) return match;
+          await page.waitForTimeout(250);
+        }
+        return null;
+      };
       await loc.click(opts);
-      await loc.fill(value, opts);
-      // Pick the matching option by clicking it. Never press Enter: on some forms that submits.
-      const option = frame.getByRole("option", { name: new RegExp(value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i") }).first();
-      if (await option.isVisible({ timeout: 2_000 }).catch(() => false)) {
-        await option.click(opts);
-        return value;
+      // Static dropdowns (Gender...) list every option once open; their wording rarely matches the
+      // profile exactly, so pick from what's actually listed. Long lists may be cut off, so only a
+      // clear match counts before searching.
+      let match = await waitForMatch(750, true);
+      // Search-as-you-type dropdowns (School, Degree) only list results after a query. The full
+      // value first, then just its first word ("Bachelor") when the full wording finds nothing.
+      const firstWord = /[A-Za-z]{4,}/.exec(value)?.[0];
+      for (const query of [value, ...(firstWord && firstWord !== value ? [firstWord] : [])]) {
+        if (match) break;
+        await loc.fill(query, opts);
+        match = await waitForMatch(query === value ? 4_000 : 3_000);
       }
-      await loc.press("Escape").catch(() => {});
-      return null;
+      if (!match) {
+        await loc.fill("", opts).catch(() => {});
+        match = await waitForMatch(750);
+      }
+      if (!match) {
+        await loc.press("Escape").catch(() => {});
+        return null;
+      }
+      // Pick the option by clicking it. Never press Enter: on some forms that submits.
+      await frame.getByRole("option", { name: match, exact: true }).first().click(opts);
+      return match;
     }
     default: {
       if (typeof value !== "string") return null;
