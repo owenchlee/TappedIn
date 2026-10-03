@@ -67,6 +67,7 @@ npm run db:migrate
 npm run dev                 # seeds data/*.json on boot
 npm run cron:once           # optional: fetch every source now
 npm test
+npm run coverage:check   # does the Jobs pipeline keep every Summer 2027 SWE/AI-ML/PM role from SimplifyJobs?
 ```
 
 ## Deploying (Vercel + Postgres)
