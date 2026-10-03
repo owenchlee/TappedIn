@@ -109,7 +109,9 @@ or an unbalanced brace). Do not touch anything before \\begin{document}. Reply w
 export function problemsPrompt(problems: string[]): string {
   return `resume.tex has these problems: ${problems.join("; ")}.
 Fix them in place without changing anything else (replace em dashes with commas or rewording;
-delete any TODO note text). Reply with just DONE.`;
+delete any TODO note text). A number, skill, tool, project, employer or organization that is not in
+the base resumes or experience.md was invented: put back the original wording from the base resume
+(or remove the claim). Never add a different unbacked fact in its place. Reply with just DONE.`;
 }
 
 /**
@@ -156,4 +158,10 @@ Steps:
    address block, no markdown.
 
 Reply with just DONE.`;
+}
+
+export function letterFixPrompt(numbers: string[]): string {
+  return `cover-letter.txt uses these numbers, which are not in experience.md or the resumes: ${numbers.join(", ")}.
+They were invented. Edit cover-letter.txt in place: use the real figure from experience.md, or
+drop the number and keep the sentence qualitative. Change nothing else. Reply with just DONE.`;
 }

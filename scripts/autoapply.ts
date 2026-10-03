@@ -16,8 +16,9 @@ import path from "node:path";
 import { chromium, type BrowserContext, type Page } from "playwright-core";
 import { PRIVATE_DIR, createJob, jobDir, readJob, writeJob, type FieldReport, type Job, type JobCommand, type StepName, type StepState } from "../lib/autoapply/job";
 import { bodyProblems, compileTex, enforcePreamble } from "../lib/autoapply/latex";
+import { factProblems, letterNumberProblems } from "../lib/autoapply/facts";
 import { runClaude, usedHumanizer } from "../lib/autoapply/claude";
-import { answersPrompt, coverLetterPrompt, fixPrompt, humanizeRetryPrompt, problemsPrompt, tailorPrompt, trimPrompt } from "../lib/autoapply/prompts";
+import { answersPrompt, coverLetterPrompt, letterFixPrompt, fixPrompt, humanizeRetryPrompt, problemsPrompt, tailorPrompt, trimPrompt } from "../lib/autoapply/prompts";
 import { fillField, hasApplicationForm, pageText, scanPage, type FormField } from "../lib/autoapply/form";
 import { mapField, type Profile } from "../lib/autoapply/profileMap";
 import { coverLetterTex } from "../lib/autoapply/coverLetterTex";
@@ -182,6 +183,10 @@ async function tailorResume(fields: FormField[], profile: Profile) {
   log(`Base resume: ${job.resumeBase}${job.forcedBase ? " (your choice)" : ""}; title suggests ${titleSuggests ?? "nothing clear"}`);
   job.tailorNotes = notes.replace(/^Base:.*\n?/im, "").replace(/^Why:.*\n?/im, "").trim();
   const baseTex = readFileSync(path.join(TEMPLATES_DIR, `${job.resumeBase}.tex`), "utf8");
+  const factSources = {
+    tex: RESUME_BASES.map((b) => readFileSync(path.join(TEMPLATES_DIR, `${b}.tex`), "utf8")),
+    experienceMd: read("experience.md"),
+  };
 
   for (let attempt = 0; attempt < 4; attempt++) {
     const { tex, restored } = enforcePreamble(baseTex, read("resume.tex"));
@@ -189,7 +194,8 @@ async function tailorResume(fields: FormField[], profile: Profile) {
       log("Model edited the preamble; restored the Overleaf original");
       writeFileSync(path.join(dir, "resume.tex"), tex);
     }
-    const problems = bodyProblems(tex);
+    // Every number, skill and entry must be backed by a base resume or experience.md.
+    const problems = [...bodyProblems(tex), ...factProblems(tex, factSources)];
     const compiled = await compileTex(dir, "resume.tex");
     let followUp: string | null = null;
     if (!compiled.ok) followUp = fixPrompt(compiled.error ?? "unknown error");
@@ -234,6 +240,17 @@ async function writeCoverLetter() {
     log(`humanizer retry: ${humanized ? "used" : "still not used"}`);
   }
 
+  const sources = {
+    tex: RESUME_BASES.map((b) => readFileSync(path.join(TEMPLATES_DIR, `${b}.tex`), "utf8")),
+    experienceMd: read("experience.md"),
+  };
+  let invented = letterNumberProblems(read("cover-letter.txt"), sources);
+  if (invented.length) {
+    log(`cover letter uses unbacked numbers (${invented.join(", ")}); asking Claude to fix`);
+    await runClaude({ cwd: dir, prompt: letterFixPrompt(invented), allowedTools: ["Read", "Edit", "Write"] });
+    invented = letterNumberProblems(read("cover-letter.txt"), sources);
+  }
+
   // Owen's standing rule: never an em dash. Deterministic backstop in case one slipped through.
   const letter = read("cover-letter.txt").replace(/\s*—\s*/g, ", ").trim();
   writeFileSync(path.join(dir, "cover-letter.txt"), `${letter}\n`);
@@ -247,10 +264,14 @@ async function writeCoverLetter() {
   copyFileSync(path.join(dir, "cover-letter.pdf"), path.join(dir, "upload", COVER_UPLOAD_NAME));
 
   job.coverLetter = { ...job.coverLetter!, humanized };
+  const issues = [
+    ...(humanized ? [] : ["/humanizer did not run"]),
+    ...(invented.length ? [`numbers not backed by your resume or experience.md: ${invented.join(", ")}`] : []),
+  ];
   step(
     "cover_letter",
-    humanized ? "done" : "failed",
-    humanized ? `${words} words, humanized` : `${words} words, but /humanizer did not run; review it before sending`,
+    issues.length ? "failed" : "done",
+    issues.length ? `${words} words, but ${issues.join("; ")}. Review it before sending` : `${words} words, humanized`,
   );
 }
 
