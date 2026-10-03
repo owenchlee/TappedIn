@@ -1,4 +1,4 @@
-import type { FillValue, FormField } from "./form";
+import { bestOption, type FillValue, type FormField } from "./form";
 
 export type Profile = {
   firstName: string;
@@ -56,11 +56,14 @@ export function mapField(
   files: { resume: string; coverLetter?: string; coverLetterText?: string },
 ): Mapped {
   const l = field.label.toLowerCase();
-  const v = (value: string | boolean | null | undefined): Mapped =>
+  const v = (value: string | boolean | null | undefined): Mapped => {
     // A recognized personal field that's blank in profile.json is Owen's to fill, never the model's.
-    value === "" || value == null
-      ? { kind: "needs_owen", reason: `"${field.label}" is blank on your Profile page` }
-      : { kind: "value", value };
+    if (value === "" || value == null) return { kind: "needs_owen", reason: `"${field.label}" is blank on your Profile page` };
+    // A choice question the profile value doesn't fit ("Have you graduated?" vs a graduation date)
+    // goes to Claude instead of failing to match at fill time.
+    if (typeof value === "string" && field.options?.length && !bestOption(field.options, value)) return { kind: "unmapped" };
+    return { kind: "value", value };
+  };
 
   if (field.kind === "file") {
     if (/cover/.test(l)) return files.coverLetter ? { kind: "value", value: { file: files.coverLetter } } : { kind: "unmapped" };
@@ -72,17 +75,25 @@ export function mapField(
   }
 
   // Sensitive: only ever answered from profile.json, never guessed by the model.
+  // The answers differ by country (a Canadian is authorized in Canada, not the US), so a question
+  // that doesn't name the country ("...in the country where this job is located?") is Owen's call.
+  const namesUs = /\b(us|u\.s\.a?\.?|usa|united states|america)\b/.test(l);
+  const namesCanada = /\bcanad/.test(l);
+  const sameEverywhere = p.authorizedToWorkInCanada != null && p.authorizedToWorkInCanada === p.authorizedToWorkInUS;
   if (/sponsor|visa/.test(l)) {
-    return p.requiresSponsorship == null
-      ? { kind: "needs_owen", reason: "Sponsorship: answer it on your Profile page" }
-      : { kind: "value", value: yesNo(p.requiresSponsorship) };
+    if (p.requiresSponsorship == null) return { kind: "needs_owen", reason: "Sponsorship: answer it on your Profile page" };
+    if (!sameEverywhere) return { kind: "needs_owen", reason: "Sponsorship depends on the job's country; answer it yourself" };
+    return { kind: "value", value: yesNo(p.requiresSponsorship) };
   }
   if (/authori[sz]|legally (eligible|able|permitted)|eligible to work|right to work|work permit/.test(l)) {
-    const us = /\b(us|u\.s\.|united states|america)\b/.test(l);
-    const val = us ? p.authorizedToWorkInUS : p.authorizedToWorkInCanada;
-    return val == null
-      ? { kind: "needs_owen", reason: `Work authorization (${us ? "US" : "Canada"}): answer it on your Profile page` }
-      : { kind: "value", value: yesNo(val) };
+    const which = namesUs && !namesCanada ? "US" : namesCanada && !namesUs ? "Canada" : null;
+    const val =
+      which === "US" ? p.authorizedToWorkInUS : which === "Canada" ? p.authorizedToWorkInCanada : sameEverywhere ? p.authorizedToWorkInCanada : null;
+    if (val != null) return { kind: "value", value: yesNo(val) };
+    return {
+      kind: "needs_owen",
+      reason: which ? `Work authorization (${which}): answer it on your Profile page` : "Work authorization depends on the job's country; answer it yourself",
+    };
   }
   const eeo: [RegExp, string][] = [
     [/gender|sex\b/, p.gender],
@@ -115,7 +126,8 @@ export function mapField(
   if (/postal|zip/.test(l)) return v(p.postalCode);
   if (/address/.test(l)) return v(p.addressLine1);
   if (/\bcity\b/.test(l)) return v(p.city);
-  if (/province|state\b/.test(l)) return v(p.province);
+  // Not a bare /state/: "Please state why..." is a free-text question, not an address field.
+  if (/\bprovince\b|^state\b|\bstate\s*(\/|or)\s*province|\b(home|current) state\b/.test(l)) return v(p.province);
   if (/country/.test(l)) return v(p.country);
   if (/location|where are you (based|located)|current(ly)? (located|residing)/.test(l)) return v(`${p.city}, ${p.province}, ${p.country}`);
   if (/how did you (hear|find|learn)|^(application |candidate )?source$|referr(al|ed) by/.test(l)) {

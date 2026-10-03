@@ -22,6 +22,7 @@ import { answersPrompt, coverLetterPrompt, letterFixPrompt, fixPrompt, humanizeR
 import { fillField, hasApplicationForm, pageText, scanPage, type FormField } from "../lib/autoapply/form";
 import { mapField, type Profile } from "../lib/autoapply/profileMap";
 import { coverLetterTex } from "../lib/autoapply/coverLetterTex";
+import { eligibilityWarnings } from "../lib/autoapply/eligibility";
 import { RESUME_BASES, RESUME_BASE_LABELS, baseFromTitle, isResumeBase, parseBaseLine, parseWhyLine } from "../lib/autoapply/base";
 
 const TEMPLATES_DIR = path.join(PRIVATE_DIR, "resume", "templates");
@@ -378,6 +379,8 @@ async function main() {
     await page.goto(job.url, { timeout: 45_000 });
     await settle(page);
     if (!has("jd.txt") || !fillOnly) writeFileSync(path.join(dir, "jd.txt"), await pageText(page));
+    job.warnings = eligibilityWarnings(read("jd.txt"));
+    if (job.warnings.length) log(`Heads up: ${job.warnings.join("; ")}`);
     const found = await findForm(page);
     page = found.page;
     let fields = found.fields;

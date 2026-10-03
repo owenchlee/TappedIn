@@ -125,6 +125,11 @@ export function ApplyStatus({ initial }: { initial: Job }) {
 
       {actionError && <p className="rounded-lg bg-overdue/10 px-3 py-2 text-sm text-overdue">{actionError}</p>}
       {job.error && <p className="rounded-lg bg-overdue/10 px-3 py-2 text-sm text-overdue">{job.error}</p>}
+      {job.warnings?.map((w) => (
+        <p key={w} className="rounded-lg bg-overdue/10 px-3 py-2 text-sm text-overdue">
+          {w}. Read the posting before you apply.
+        </p>
+      ))}
       {job.status === "ready" && !job.submittedAt && (
         <p className="rounded-lg bg-surface-2 px-3 py-2 text-sm text-muted">
           The form is filled in the Chrome window. Check it over, finish anything marked below, then click Submit on the site yourself. Nothing was submitted for you.

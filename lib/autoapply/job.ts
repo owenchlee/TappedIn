@@ -37,6 +37,8 @@ export type Job = {
   coverLetter?: { needed: boolean; reason: string; humanized?: boolean };
   tailorNotes?: string;
   fields?: FieldReport[];
+  /** Eligibility red flags found in the posting text (e.g. U.S. citizenship required). */
+  warnings?: string[];
   error?: string;
   /** Set when Owen confirms he clicked Submit on the real site (the runner never submits). */
   submittedAt?: string;
