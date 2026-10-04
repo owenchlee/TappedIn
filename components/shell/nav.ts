@@ -10,7 +10,6 @@ import {
   Settings,
   Trophy,
   UsersRound,
-  UserRound,
   Contact,
   Wand2,
   type LucideIcon,
@@ -40,12 +39,7 @@ export function youItems(opts: { autoApply: boolean }): NavItem[] {
     { href: "/contacts", label: "Contacts", icon: Contact, hint: "Recruiters and referrers" },
     { href: "/journey", label: "Journey", icon: Route, hint: "Your five years, term by term" },
     { href: "/insights", label: "Insights", icon: BarChart3, hint: "How your search is going" },
-    ...(opts.autoApply
-      ? [
-          { href: "/apply", label: "Auto-apply", icon: Wand2, hint: "Fill applications for you" },
-          { href: "/profile", label: "Profile", icon: UserRound, hint: "Answers used to auto-fill" },
-        ]
-      : []),
+    ...(opts.autoApply ? [{ href: "/apply", label: "Resumes", icon: Wand2, hint: "Tailored resumes and cover letters" }] : []),
   ];
 }
 

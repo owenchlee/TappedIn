@@ -5,9 +5,10 @@ import { useRouter } from "next/navigation";
 import { Wand2 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
+import { Textarea } from "@/components/ui/Textarea";
 import { startAutoApplyUrl } from "@/actions/apply";
 
-/** Auto-apply to a posting that isn't tracked in Coop Hub: paste its link. */
+/** Tailor for a posting that isn't in the Jobs list: paste its link (and its text, if the site can't be read). */
 export function ApplyFromUrl() {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -31,8 +32,15 @@ export function ApplyFromUrl() {
       <Input name="company" placeholder="Company" aria-label="Company" />
       <Input name="role" placeholder="Role" aria-label="Role" />
       <Button type="submit" variant="primary" disabled={isPending}>
-        <Wand2 /> Auto-apply
+        <Wand2 /> Tailor
       </Button>
+      <Textarea
+        name="description"
+        rows={3}
+        placeholder="Job description (optional: paste it if the link needs a login or doesn't load)"
+        aria-label="Job description"
+        className="sm:col-span-4"
+      />
       {error && <p className="text-sm text-overdue sm:col-span-4">{error}</p>}
     </form>
   );

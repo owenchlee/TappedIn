@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 import { readJob } from "@/lib/autoapply/job";
 import { ApplyStatus } from "@/components/autoapply/ApplyStatus";
 
-export const metadata: Metadata = { title: "Auto-apply" };
+export const metadata: Metadata = { title: "Resume" };
 export const dynamic = "force-dynamic";
 
 export default async function AutoApplyJobPage({ params }: { params: Promise<{ id: string }> }) {
@@ -16,7 +16,7 @@ export default async function AutoApplyJobPage({ params }: { params: Promise<{ i
   return (
     <div>
       <Link href="/apply" className="mb-3 inline-block text-xs text-muted hover:text-text">
-        ← All auto-apply runs
+        ← All resumes
       </Link>
       <ApplyStatus initial={job} />
     </div>

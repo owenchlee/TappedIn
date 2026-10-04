@@ -2,21 +2,20 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState, useTransition } from "react";
-import { Check, Circle, ExternalLink, FileText, Loader2, Minus, RefreshCw, Send, X } from "lucide-react";
+import { Check, Circle, Download, ExternalLink, FileText, Loader2, Minus, Send, X } from "lucide-react";
 import { clsx } from "clsx";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { SectionTitle } from "@/components/ui/PageHeader";
-import { markAutoApplySubmitted, rebaseAutoApply, reopenAutoApply, sendApplyCommand } from "@/actions/apply";
+import { markAutoApplySubmitted, rebaseAutoApply, requestCoverLetter } from "@/actions/apply";
 import type { Job, StepName, StepState } from "@/lib/autoapply/job";
 import { BASE_BADGE, RESUME_BASES, RESUME_BASE_LABELS } from "@/lib/autoapply/base";
 
 const STEP_LABELS: Record<StepName, string> = {
-  open: "Open the posting in Chrome",
+  open: "Read the posting",
   tailor: "Tailor your resume (LaTeX, one page)",
-  cover_letter: "Cover letter (only if required)",
-  fill: "Fill the application form",
+  cover_letter: "Cover letter (when the posting asks for one)",
 };
 
 function StepIcon({ state }: { state: StepState }) {
@@ -29,9 +28,9 @@ function StepIcon({ state }: { state: StepState }) {
 
 const STATUS_BADGE: Record<Job["status"], { label: string; variant: "accent" | "emerald" | "overdue" | "muted" }> = {
   running: { label: "Working", variant: "accent" },
-  ready: { label: "Ready for you to review", variant: "emerald" },
+  ready: { label: "Ready", variant: "emerald" },
   failed: { label: "Needs attention", variant: "overdue" },
-  closed: { label: "Browser closed", variant: "muted" },
+  closed: { label: "Done", variant: "muted" },
 };
 
 export function ApplyStatus({ initial }: { initial: Job }) {
@@ -41,15 +40,14 @@ export function ApplyStatus({ initial }: { initial: Job }) {
   const overleafForm = useRef<HTMLFormElement>(null);
   const overleafSnip = useRef<HTMLTextAreaElement>(null);
 
-  // Fast polling while the runner works; slower afterwards so "Fill this page again" results and a
-  // closed window still show up. Stops once the browser is closed.
+  // Poll while the runner works; it writes job.json as each step finishes.
   useEffect(() => {
-    if (job.status === "closed") return;
+    if (job.status !== "running") return;
     const t = setTimeout(async () => {
       const res = await fetch(`/api/apply/${job.id}`, { cache: "no-store" }).catch(() => null);
       if (res?.ok) setJob(await res.json());
       else setJob((j) => ({ ...j })); // keep the loop going through a transient failure
-    }, job.status === "running" ? 1500 : 4000);
+    }, 1500);
     return () => clearTimeout(t);
   }, [job]);
 
@@ -73,8 +71,6 @@ export function ApplyStatus({ initial }: { initial: Job }) {
   const resumeReady = job.steps.tailor.state === "done";
   const base = job.resumeBase ?? "software";
   const coverReady = Boolean(job.coverLetter?.needed) && job.steps.cover_letter.state !== "running" && job.steps.cover_letter.state !== "pending";
-  const browserOpen = job.status !== "closed";
-  const needsYou = (job.fields ?? []).filter((f) => !f.filled);
   const badge = STATUS_BADGE[job.status];
   const file = (name: string) => `/api/apply/${job.id}/files/${name}`;
 
@@ -89,30 +85,16 @@ export function ApplyStatus({ initial }: { initial: Job }) {
           </div>
           <p className="mt-1 text-sm text-muted">{job.role}</p>
           <a href={job.url} target="_blank" rel="noopener noreferrer" className="mt-1 inline-flex items-center gap-1 text-xs text-accent hover:underline">
-            Posting <ExternalLink className="size-3" />
+            Open the posting <ExternalLink className="size-3" />
           </a>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          {browserOpen ? (
-            <>
-              <Button size="sm" disabled={isPending || job.status === "running"} onClick={() => run(() => sendApplyCommand(job.id, "refill"))}>
-                <RefreshCw /> Fill this page again
-              </Button>
-              <Button size="sm" variant="ghost" disabled={isPending} onClick={() => run(() => sendApplyCommand(job.id, "close"))}>
-                Close browser
-              </Button>
-            </>
-          ) : (
-            <Button size="sm" disabled={isPending} onClick={() => run(() => reopenAutoApply(job.id).then(() => setJob((j) => ({ ...j, status: "running" }))))}>
-              <RefreshCw /> Reopen and fill
-            </Button>
-          )}
           {!job.submittedAt && job.status !== "running" && resumeReady && (
             <Button size="sm" variant="primary" disabled={isPending} onClick={() => run(async () => {
               await markAutoApplySubmitted(job.id);
               setJob((j) => ({ ...j, submittedAt: new Date().toISOString() }));
             })}>
-              <Send /> I submitted it
+              <Send /> I applied
             </Button>
           )}
           {job.submittedAt && job.applicationId && (
@@ -132,12 +114,12 @@ export function ApplyStatus({ initial }: { initial: Job }) {
       ))}
       {job.status === "ready" && !job.submittedAt && (
         <p className="rounded-lg bg-surface-2 px-3 py-2 text-sm text-muted">
-          The form is filled in the Chrome window. Check it over, finish anything marked below, then click Submit on the site yourself. Nothing was submitted for you.
+          Download the PDFs below and attach them when you apply. Then hit &ldquo;I applied&rdquo; so it shows up in Applications.
         </p>
       )}
 
       <Card className="space-y-2.5">
-        {(Object.keys(STEP_LABELS) as StepName[]).map((s) => (
+        {(Object.keys(STEP_LABELS) as StepName[]).filter((s) => job.steps[s]).map((s) => (
           <div key={s} className="flex items-start gap-2.5">
             <span className="mt-0.5"><StepIcon state={job.steps[s].state} /></span>
             <div className="min-w-0">
@@ -166,7 +148,8 @@ export function ApplyStatus({ initial }: { initial: Job }) {
                   </p>
                 )}
                 <div className="flex flex-wrap gap-2">
-                  <a className="text-xs font-medium text-accent hover:underline" href={file("resume.pdf")} target="_blank" rel="noreferrer">View PDF</a>
+                  <a className="inline-flex items-center gap-1 text-xs font-medium text-accent hover:underline" href={`${file("resume.pdf")}?download`}><Download className="size-3" /> Download PDF</a>
+                  <a className="text-xs font-medium text-accent hover:underline" href={file("resume.pdf")} target="_blank" rel="noreferrer">View</a>
                   <a className="text-xs font-medium text-accent hover:underline" href={`${file("resume.tex")}?download`}>Download .tex</a>
                   <button type="button" className="text-xs font-medium text-accent hover:underline" onClick={openInOverleaf}>Open in Overleaf</button>
                 </div>
@@ -188,46 +171,28 @@ export function ApplyStatus({ initial }: { initial: Job }) {
             <Card className="space-y-2">
               <p className="flex items-center gap-1.5 text-sm font-medium text-text"><FileText className="size-4" /> Cover letter</p>
               <p className="text-xs text-muted">
-                {job.coverLetter ? job.coverLetter.reason : "Deciding once the form is read."}
+                {job.coverLetter ? job.coverLetter.reason : "Deciding once the posting is read."}
                 {job.coverLetter?.needed && job.coverLetter.humanized === false && " The /humanizer skill didn't run on it, so read it carefully."}
               </p>
               <div className="flex flex-wrap gap-2">
                 {coverReady && job.steps.cover_letter.state === "done" && (
                   <>
-                    <a className="text-xs font-medium text-accent hover:underline" href={file("cover-letter.pdf")} target="_blank" rel="noreferrer">View PDF</a>
+                    <a className="inline-flex items-center gap-1 text-xs font-medium text-accent hover:underline" href={`${file("cover-letter.pdf")}?download`}><Download className="size-3" /> Download PDF</a>
+                    <a className="text-xs font-medium text-accent hover:underline" href={file("cover-letter.pdf")} target="_blank" rel="noreferrer">View</a>
                     <a className="text-xs font-medium text-accent hover:underline" href={file("cover-letter.txt")} target="_blank" rel="noreferrer">Plain text</a>
                   </>
                 )}
-                {browserOpen && job.coverLetter && !job.coverLetter.needed && job.status !== "running" && (
-                  <button type="button" disabled={isPending} className="text-xs font-medium text-accent hover:underline" onClick={() => run(() => sendApplyCommand(job.id, "cover"))}>
-                    Write one anyway
+                {job.coverLetter && !job.coverLetter.needed && job.status !== "running" && (
+                  <button type="button" disabled={isPending} className="text-xs font-medium text-accent hover:underline" onClick={() => run(async () => {
+                    await requestCoverLetter(job.id);
+                    setJob((j) => ({ ...j, status: "running" }));
+                  })}>
+                    Write one
                   </button>
                 )}
               </div>
             </Card>
           </div>
-        </section>
-      )}
-
-      {job.fields && job.fields.length > 0 && (
-        <section>
-          <SectionTitle action={needsYou.length ? <Badge variant="amber">{needsYou.length} for you</Badge> : undefined}>Form fields</SectionTitle>
-          <Card className="divide-y divide-border p-0">
-            {[...job.fields]
-              .sort((a, b) => Number(a.filled) - Number(b.filled) || Number(b.required) - Number(a.required))
-              .map((f, i) => (
-                <div key={`${f.label}-${i}`} className="flex items-start gap-2.5 px-4 py-2.5">
-                  <span className="mt-0.5">{f.filled ? <Check className="size-4 text-emerald-500" /> : <Circle className="size-4 text-amber-500" />}</span>
-                  <div className="min-w-0">
-                    <p className="text-sm text-text">
-                      {f.label}
-                      {f.required && <span className="text-overdue"> *</span>}
-                    </p>
-                    <p className="truncate text-xs text-muted">{f.filled ? f.value : f.reason}</p>
-                  </div>
-                </div>
-              ))}
-          </Card>
         </section>
       )}
 

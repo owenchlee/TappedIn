@@ -10,29 +10,29 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { ApplyFromUrl } from "@/components/autoapply/ApplyFromUrl";
 import { relativeTime } from "@/lib/format";
 
-export const metadata: Metadata = { title: "Auto-apply" };
+export const metadata: Metadata = { title: "Resumes" };
 export const dynamic = "force-dynamic";
 
 const STATUS: Record<Job["status"], { label: string; variant: "accent" | "emerald" | "overdue" | "muted" }> = {
   running: { label: "Working", variant: "accent" },
   ready: { label: "Ready to review", variant: "emerald" },
   failed: { label: "Needs attention", variant: "overdue" },
-  closed: { label: "Closed", variant: "muted" },
+  closed: { label: "Done", variant: "muted" },
 };
 
-export default function AutoApplyPage() {
+export default function ResumesPage() {
   if (process.env.AUTO_APPLY_ENABLED !== "1") notFound();
   const jobs = listJobs();
 
   return (
     <div>
       <PageHeader
-        title="Auto-apply"
-        description="Opens the posting in Chrome, tailors your Overleaf resume to it, writes a cover letter only when one is required, and fills the form. You review and click Submit."
+        title="Resumes & cover letters"
+        description="Hit Tailor on any job: the posting opens in a new tab, and your Overleaf resume is tailored to it (plus a cover letter when the posting asks for one) while you look. Apply however you like; Simplify can fill the form."
       />
 
       <section className="mb-8">
-        <SectionTitle>Apply to a link</SectionTitle>
+        <SectionTitle>Tailor for a link</SectionTitle>
         <Card>
           <ApplyFromUrl />
         </Card>
@@ -41,7 +41,7 @@ export default function AutoApplyPage() {
       <section>
         <SectionTitle>Runs</SectionTitle>
         {jobs.length === 0 ? (
-          <EmptyState title="No auto-apply runs yet" description="Hit Auto-apply on any job, design team, club, or hackathon, or paste a link above." />
+          <EmptyState title="Nothing tailored yet" description="Hit Tailor on any job, design team, club or hackathon, or paste a link above." />
         ) : (
           <Card className="divide-y divide-border p-0">
             {jobs.map((j) => (

@@ -85,7 +85,7 @@ export function JobRow({ job, isNew }: { job: JobRowData; isNew: boolean }) {
                 </button>
               </>
             )}
-            {(!tracked || tracked.status === "interested") && <ApplyButton kind="coop" id={job.id} />}
+            {(!tracked || tracked.status === "interested") && <ApplyButton kind="coop" id={job.id} url={job.url} />}
             <a
               href={job.url}
               target="_blank"

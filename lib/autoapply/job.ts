@@ -4,18 +4,18 @@ import type { ResumeBase } from "./base";
 
 // Shared between the Next.js app and the detached runner (scripts/autoapply.ts), so this module
 // must stay free of Next and Prisma imports. The runner owns job.json once it starts; the app only
-// creates it and afterwards talks to the runner through command.json.
+// creates it (plus jd.txt when it already has the posting text) and starts the runner.
 
 export const PRIVATE_DIR = path.join(/* turbopackIgnore: true */ process.cwd(), "private");
 export const APPLICATIONS_DIR = path.join(PRIVATE_DIR, "applications");
 
-export const STEP_NAMES = ["open", "tailor", "cover_letter", "fill"] as const;
+// "open" is reading the posting (the name predates the switch from form filling to documents only).
+export const STEP_NAMES = ["open", "tailor", "cover_letter"] as const;
 export type StepName = (typeof STEP_NAMES)[number];
 export type StepState = "pending" | "running" | "done" | "skipped" | "failed";
 
+/** "closed" only appears on runs from before 2026-10-04, when a browser window was part of it. */
 export type JobStatus = "running" | "ready" | "failed" | "closed";
-
-export type FieldReport = { label: string; filled: boolean; value?: string; reason?: string; required: boolean };
 
 export type Job = {
   id: string;
@@ -38,17 +38,14 @@ export type Job = {
   forcedBase?: ResumeBase;
   coverLetter?: { needed: boolean; reason: string; humanized?: boolean };
   tailorNotes?: string;
-  fields?: FieldReport[];
   /** Eligibility red flags found in the posting text (e.g. U.S. citizenship required). */
   warnings?: string[];
   error?: string;
-  /** Set when Owen confirms he clicked Submit on the real site (the runner never submits). */
+  /** Set when Owen says he applied (he applies himself, on the company's site). */
   submittedAt?: string;
   applicationId?: string;
   log: { at: string; msg: string }[];
 };
-
-export type JobCommand = { command: "refill" | "cover" | "close" | "rebase"; at: string; base?: ResumeBase };
 
 const ID_RE = /^[a-z0-9-]{8,80}$/;
 
@@ -82,7 +79,7 @@ export function createJob(input: Pick<Job, "source" | "company" | "role" | "url"
     updatedAt: now.toISOString(),
     ...input,
     status: "running",
-    steps: { open: { state: "pending" }, tailor: { state: "pending" }, cover_letter: { state: "pending" }, fill: { state: "pending" } },
+    steps: { open: { state: "pending" }, tailor: { state: "pending" }, cover_letter: { state: "pending" } },
     log: [],
   };
   mkdirSync(jobDir(job.id), { recursive: true });
@@ -116,12 +113,6 @@ export function listJobs(): Job[] {
     .map(readJob)
     .filter((j): j is Job => j != null)
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
-}
-
-export function writeCommand(id: string, command: JobCommand["command"], base?: ResumeBase): void {
-  const file = path.join(jobDir(id), "command.json");
-  writeFileSync(`${file}.tmp`, JSON.stringify({ command, at: new Date().toISOString(), base } satisfies JobCommand));
-  renameSync(`${file}.tmp`, file);
 }
 
 /** Files the UI may serve for a job. Anything else in the job dir (prompts, logs) stays private. */

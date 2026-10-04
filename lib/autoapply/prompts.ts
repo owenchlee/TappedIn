@@ -1,5 +1,5 @@
 // Prompts for the headless Claude Code runs. Each run's cwd is the job folder, which holds:
-//   jd.txt, experience.md, software.tex, hardware.tex, pm.tex, questions.json (and resume.tex once written)
+//   jd.txt, experience.md, software.tex, hardware.tex, pm.tex (and resume.tex once written)
 
 import type { ResumeBase } from "./base";
 
@@ -29,9 +29,8 @@ Files in the current directory:
 - experience.md: everything true about Owen (source of truth)
 - software.tex, hardware.tex and pm.tex: his three Overleaf resumes (Jake's Resume template); pm.tex is
   his product management resume
-- questions.json: application-form questions that still need an answer
 
-Do these three things, then reply with just DONE.
+Do these two things, then reply with just DONE.
 
 ${pickBaseStep(opts.forcedBase)}
 
@@ -48,16 +47,6 @@ ${pickBaseStep(opts.forcedBase)}
 - Keep LaTeX escaping correct (\\%, \\&, \\$, \\#). Never leave a TODO in the output.
 - If the base has "\\% TODO" notes in a bullet, remove the note text (and never carry it over).
 
-3) Write answers.json: an object mapping each question "id" from questions.json to an answer.
-- For "select"/"radio" questions the answer must be exactly one of that question's options.
-- For "checkbox" questions answer true or false.
-- Answer null when the question is about work authorization, visas or sponsorship, salary,
-  demographics or self-identification, criminal history, or anything experience.md can't answer
-  truthfully (for example specific availability dates). Owen will answer those himself.
-- Free-text answers: first person, concise (under 120 words unless the question asks for more),
-  specific to this company, grounded in experience.md. If a free-text answer is longer than two
-  sentences, run the humanizer skill (Skill tool) on it and use the humanized version.
-
 Also write notes.md. Its first line must be exactly "Base: software", "Base: hardware" or "Base: pm".
 Its second line must be "Why: " followed by one plain sentence on why that base fits this job. Then:
 the posting's key requirements and how the
@@ -65,23 +54,6 @@ resume now covers each; important keywords you could NOT add because Owen doesn'
 short list of what you changed.
 
 ${TRUTH_RULES}`;
-}
-
-/** For later pages of multi-page forms (Workday etc.): answers only, resume already done. */
-export function answersPrompt(opts: { company: string; role: string }): string {
-  return `Owen Lee is applying for ${opts.role} at ${opts.company}. jd.txt is the posting,
-experience.md is the source of truth about Owen, resume.tex is his tailored resume.
-
-Write answers.json: an object mapping each question "id" in questions.json to an answer.
-- "select"/"radio": exactly one of that question's options. "checkbox": true or false.
-- null for work authorization, visas or sponsorship, salary, demographics or self-identification,
-  criminal history, or anything experience.md can't answer truthfully.
-- Free text: first person, concise, specific, grounded in experience.md. Run the humanizer skill
-  (Skill tool) on any answer longer than two sentences.
-
-${TRUTH_RULES}
-
-Reply with just DONE.`;
 }
 
 export function humanizeRetryPrompt(): string {

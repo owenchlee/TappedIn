@@ -113,7 +113,7 @@ export function OrgCard({ org, tags, category }: { org: OrgView; tags: string[];
       <div className="mt-auto flex flex-wrap items-center justify-between gap-2 border-t border-border pt-3">
         <span className="text-[11px] text-muted-2">{org.lastCheckedAt ? `Checked ${relativeTime(org.lastCheckedAt)}` : "Never checked"}</span>
         <div className="flex items-center gap-1.5">
-          {org.applyUrl && <ApplyButton kind="org" id={org.id} />}
+          {org.applyUrl && <ApplyButton kind="org" id={org.id} url={org.applyUrl} />}
           {org.applyUrl && (
             <a href={org.applyUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-xs font-medium text-accent hover:underline">
               Apply
