@@ -13,7 +13,7 @@
     "db:seed": "tsx prisma/seed.ts",
     "cron:once": "tsx -e \"import('./lib/jobs/dailyRefresh.ts').then(m=>m.runDailyRefresh()).then(r=>{console.log(JSON.stringify(r,null,2));process.exit(0)})\"",
     "test": "vitest run",
-    "vercel-build": "prisma generate && prisma migrate deploy && tsx prisma/seed.ts && next build",
+    "vercel-build": "prisma generate && prisma migrate deploy && tsx prisma/seed.ts && tsx scripts/job-details.ts --rescore && next build",
     "db:dev": "prisma dev --name tappedin --detach",
     "coverage:check": "tsx scripts/coverage-check.ts",
     "jobs:details": "tsx scripts/job-details.ts"

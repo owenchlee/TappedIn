@@ -99,7 +99,7 @@ npm run jobs:details     # read every posting's text and score it (the daily ref
 
 1. Create the Vercel project and connect a Postgres database (Storage → Neon or Prisma Postgres), which sets `DATABASE_URL`.
 2. Set env vars: `APP_PASSWORD`, `AUTH_SECRET`, `CRON_SECRET` (long random strings), optionally `DISPLAY_NAME`.
-3. Deploy. The `vercel-build` script runs migrations and seeds `data/*.json` before `next build`.
+3. Deploy. The `vercel-build` script runs migrations, seeds `data/*.json` and re-scores every job before `next build`.
 4. `vercel.json` schedules `/api/cron/refresh` daily at 12:00 UTC (8am Toronto). Trigger it manually from **Sources → Refresh everything**.
 
 Back up from **Settings → Full backup** every so often.

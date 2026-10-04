@@ -6,6 +6,7 @@ import { parsePrefs, PREFS_KEY, type JobPrefs } from "@/lib/fit/prefs";
 import { scoreJob } from "@/lib/fit/score";
 import { termsInText } from "@/lib/fit/requirements";
 import { postingTerms } from "@/lib/sources/enrich";
+import { regionForLocations } from "@/lib/sources/normalize";
 import { plausibleTerms } from "@/lib/terms";
 
 const DAY = 86_400_000;
@@ -19,6 +20,16 @@ export async function saveJobPrefs(prefs: JobPrefs): Promise<void> {
 }
 
 const BATCH = 400;
+
+/**
+ * A fetched job's region, re-read from its location so fixes to the location rules reach rows stored
+ * before them ("New Brunswick, NJ" was once Canada). Never moves a job to "remote" on its own: a
+ * mixed "US, Remote" list is ambiguous, and the source's call stands.
+ */
+export function effectiveRegion(r: { region: string | null; location: string | null }): string | null {
+  const now = r.location ? regionForLocations(r.location.split(" · ")) : null;
+  return now && now !== "remote" ? now : r.region;
+}
 
 /**
  * A fetched job's terms, minus ones already over when it was posted (mislabelled by the list), and
@@ -54,6 +65,7 @@ export async function rescoreJobs(opts: { onlyUnscored?: boolean; ids?: string[]
         terms: true,
         category: true,
         region: true,
+        location: true,
         postedAt: true,
         firstSeenAt: true,
         deadline: true,
@@ -66,14 +78,16 @@ export async function rescoreJobs(opts: { onlyUnscored?: boolean; ids?: string[]
     });
     if (rows.length === 0) break;
     const values = rows.map((r) => {
-      const terms = r.origin === "manual" ? r.terms : effectiveTerms(r);
-      const fit = scoreJob({ ...r, terms }, prefs, now);
-      return { id: r.id, terms, score: fit.score, reasons: fit.reasons, flags: fit.flags };
+      const fetched = r.origin !== "manual";
+      const terms = fetched ? effectiveTerms(r) : r.terms;
+      const region = fetched ? effectiveRegion(r) : r.region;
+      const fit = scoreJob({ ...r, terms, region }, prefs, now);
+      return { id: r.id, terms, region, score: fit.score, reasons: fit.reasons, flags: fit.flags };
     });
     await prisma.$executeRaw`
       UPDATE "CoopPosting" AS c
-      SET "terms" = v.terms, "fitScore" = v.score, "fitReasons" = v.reasons, "flags" = v.flags
-      FROM jsonb_to_recordset(${JSON.stringify(values)}::jsonb) AS v(id text, terms text[], score int, reasons text[], flags text[])
+      SET "terms" = v.terms, "region" = v.region, "fitScore" = v.score, "fitReasons" = v.reasons, "flags" = v.flags
+      FROM jsonb_to_recordset(${JSON.stringify(values)}::jsonb) AS v(id text, terms text[], region text, score int, reasons text[], flags text[])
       WHERE c.id = v.id`;
     done += rows.length;
     cursor = rows[rows.length - 1].id;
