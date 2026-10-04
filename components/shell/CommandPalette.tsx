@@ -6,7 +6,7 @@ import { clsx } from "clsx";
 import { ArrowRight, Loader2, Search } from "lucide-react";
 import { searchAll, type SearchResult } from "@/actions/search";
 import { CompanyLogo } from "@/components/CompanyLogo";
-import { PRIMARY_NAV, moreSections } from "@/components/shell/nav";
+import { PRIMARY_NAV, moreSections, youItems } from "@/components/shell/nav";
 
 const OPEN_EVENT = "tappedin:open-palette";
 
@@ -14,7 +14,7 @@ export function openCommandPalette() {
   window.dispatchEvent(new Event(OPEN_EVENT));
 }
 
-const PAGES: SearchResult[] = [...PRIMARY_NAV, ...moreSections({ autoApply: false }).flatMap((s) => s.items)].map((item) => ({ id: `p-${item.href}`, kind: "page" as const, title: item.label, subtitle: "Go to page", href: item.href }));
+const PAGES: SearchResult[] = [...PRIMARY_NAV, ...moreSections().flatMap((s) => s.items), ...youItems({ autoApply: false })].map((item) => ({ id: `p-${item.href}`, kind: "page" as const, title: item.label, subtitle: "Go to page", href: item.href }));
 
 export function CommandPalette() {
   const router = useRouter();

@@ -34,8 +34,23 @@ export const PRIMARY_NAV: NavItem[] = [
   { href: "/calendar", label: "Calendar", icon: CalendarDays },
 ];
 
+/** Your own pages, in the profile menu (the avatar at the top right). */
+export function youItems(opts: { autoApply: boolean }): NavItem[] {
+  return [
+    { href: "/contacts", label: "Contacts", icon: Contact, hint: "Recruiters and referrers" },
+    { href: "/journey", label: "Journey", icon: Route, hint: "Your five years, term by term" },
+    { href: "/insights", label: "Insights", icon: BarChart3, hint: "How your search is going" },
+    ...(opts.autoApply
+      ? [
+          { href: "/apply", label: "Auto-apply", icon: Wand2, hint: "Fill applications for you" },
+          { href: "/profile", label: "Profile", icon: UserRound, hint: "Answers used to auto-fill" },
+        ]
+      : []),
+  ];
+}
+
 /** Everything else, tucked under "More". */
-export function moreSections(opts: { autoApply: boolean }): NavSection[] {
+export function moreSections(): NavSection[] {
   return [
     {
       label: "Explore",
@@ -46,24 +61,10 @@ export function moreSections(opts: { autoApply: boolean }): NavSection[] {
       ],
     },
     {
-      label: "You",
-      items: [
-        { href: "/contacts", label: "Contacts", icon: Contact, hint: "Recruiters and referrers" },
-        { href: "/journey", label: "Journey", icon: Route, hint: "Your five years, term by term" },
-        { href: "/insights", label: "Insights", icon: BarChart3, hint: "How your search is going" },
-        ...(opts.autoApply
-          ? [
-              { href: "/apply", label: "Auto-apply", icon: Wand2, hint: "Fill applications for you" },
-              { href: "/profile", label: "Profile", icon: UserRound, hint: "Answers used to auto-fill" },
-            ]
-          : []),
-      ],
-    },
-    {
       label: "Setup",
       items: [
         { href: "/sources", label: "Sources", icon: Radar, hint: "Where jobs come from" },
-        { href: "/settings", label: "Settings", icon: Settings, hint: "Backup, calendar link, sign out" },
+        { href: "/settings", label: "Settings", icon: Settings, hint: "Preferences, backup, calendar link" },
       ],
     },
   ];

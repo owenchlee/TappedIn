@@ -7,6 +7,7 @@ import { clsx } from "clsx";
 import { ChevronDown, LayoutGrid, Search, X } from "lucide-react";
 import { PRIMARY_NAV, moreSections, isActive, type NavItem } from "@/components/shell/nav";
 import { ThemeToggle } from "@/components/shell/ThemeToggle";
+import { ProfileMenu } from "@/components/shell/ProfileMenu";
 import { LogoMark } from "@/components/shell/LogoMark";
 import { CommandPalette, openCommandPalette } from "@/components/shell/CommandPalette";
 import { AutoApplyProvider } from "@/components/autoapply/AutoApplyContext";
@@ -55,12 +56,12 @@ function TopLink({ item, count }: { item: NavItem; count?: number }) {
 }
 
 /** The grouped list of secondary pages, shared by the desktop popover and the mobile sheet. */
-function MoreContent({ autoApply, onNavigate }: { autoApply: boolean; onNavigate: () => void }) {
+function MoreContent({ onNavigate }: { onNavigate: () => void }) {
   const pathname = usePathname();
   return (
     <div className="flex flex-col gap-5">
-      <div className="grid grid-cols-1 gap-5 sm:grid-cols-3">
-        {moreSections({ autoApply }).map((section) => (
+      <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+        {moreSections().map((section) => (
           <div key={section.label}>
             <p className="mb-1.5 px-2 text-[11px] font-semibold tracking-wide text-muted-2 uppercase">{section.label}</p>
             <div className="flex flex-col gap-0.5">
@@ -102,11 +103,11 @@ function MoreContent({ autoApply, onNavigate }: { autoApply: boolean; onNavigate
   );
 }
 
-function DesktopMore({ autoApply }: { autoApply: boolean }) {
+function DesktopMore() {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
-  const inMore = moreSections({ autoApply }).some((s) => s.items.some((i) => isActive(pathname, i.href)));
+  const inMore = moreSections().some((s) => s.items.some((i) => isActive(pathname, i.href)));
 
   useEffect(() => {
     if (!open) return;
@@ -137,8 +138,8 @@ function DesktopMore({ autoApply }: { autoApply: boolean }) {
         <ChevronDown className={clsx("size-3.5 transition-transform duration-200", open && "rotate-180")} />
       </button>
       {open && (
-        <div className="animate-pop-in absolute top-full left-1/2 z-30 mt-2 w-[720px] -translate-x-1/2 rounded-3xl border border-border bg-surface p-5 shadow-pop">
-          <MoreContent autoApply={autoApply} onNavigate={() => setOpen(false)} />
+        <div className="animate-pop-in absolute top-full left-1/2 z-30 mt-2 w-[480px] -translate-x-1/2 rounded-3xl border border-border bg-surface p-5 shadow-pop">
+          <MoreContent onNavigate={() => setOpen(false)} />
         </div>
       )}
     </div>
@@ -150,11 +151,15 @@ export function AppShell({
   counts,
   autoApply,
   defaultTerm,
+  displayName,
+  canSignOut,
 }: {
   children: React.ReactNode;
   counts: NavCounts;
   autoApply: boolean;
   defaultTerm: string;
+  displayName: string;
+  canSignOut: boolean;
 }) {
   const pathname = usePathname();
   const [sheetOpen, setSheetOpen] = useState(false);
@@ -179,7 +184,7 @@ export function AppShell({
             {PRIMARY_NAV.map((item) => (
               <TopLink key={item.href} item={item} count={item.badgeKey ? counts[item.badgeKey] : undefined} />
             ))}
-            <DesktopMore autoApply={autoApply} />
+            <DesktopMore />
           </nav>
           <div className="ml-auto flex items-center gap-2">
             <button
@@ -193,6 +198,7 @@ export function AppShell({
               <kbd className="hidden rounded-md border border-border bg-surface-2 px-1.5 font-mono text-[10px] md:inline">Ctrl K</kbd>
             </button>
             <LogApplicationButton defaultTerm={defaultTerm} label="Add" />
+            <ProfileMenu name={displayName} autoApply={autoApply} canSignOut={canSignOut} />
           </div>
         </div>
       </header>
@@ -220,7 +226,7 @@ export function AppShell({
                 <X className="size-5" />
               </button>
             </div>
-            <MoreContent autoApply={autoApply} onNavigate={() => setSheetOpen(false)} />
+            <MoreContent onNavigate={() => setSheetOpen(false)} />
           </div>
         </div>
       )}
