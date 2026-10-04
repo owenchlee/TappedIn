@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { ArrowRight, CalendarDays, Sparkles } from "lucide-react";
 import { getAgenda, getOverdue } from "@/lib/data/agenda";
-import { getTopMatches, getOpenOpportunities, getStaleApplications, getTodayStats } from "@/lib/data/home";
+import { getClosingSoon, getTopMatches, getOpenOpportunities, getStaleApplications, getTodayStats } from "@/lib/data/home";
 import { jobsSeenAt } from "@/lib/data/nav";
 import { listUnseenSignals } from "@/lib/data/orgs";
 import { DismissSignalButton } from "@/components/DismissSignalButton";
@@ -70,7 +70,7 @@ const ROW = "flex items-center gap-3 rounded-xl px-3 py-2.5 transition-colors ho
 export default async function HomePage() {
   const now = new Date();
   const seenAt = await jobsSeenAt();
-  const [stats, agenda, overdue, stale, fresh, opportunities, signals] = await Promise.all([
+  const [stats, agenda, overdue, stale, fresh, opportunities, signals, closing] = await Promise.all([
     getTodayStats(now),
     getAgenda(new Date(now.getTime() - DAY / 2), new Date(now.getTime() + 14 * DAY)),
     getOverdue(now),
@@ -78,6 +78,7 @@ export default async function HomePage() {
     getTopMatches(),
     getOpenOpportunities(now),
     listUnseenSignals(),
+    getClosingSoon(now),
   ]);
   const term = termForDate(now);
   const dateLine = new Intl.DateTimeFormat("en-US", { timeZone: "America/Toronto", weekday: "long", month: "long", day: "numeric" }).format(now);
@@ -149,6 +150,30 @@ export default async function HomePage() {
                 </div>
               );
             })}
+          </Card>
+        </section>
+      )}
+
+      {closing.length > 0 && (
+        <section>
+          <SectionTitle action={<SeeAll href="/jobs?region=all&sort=deadline">By deadline</SeeAll>}>Closing this week</SectionTitle>
+          <Card className="space-y-0.5 p-2">
+            {closing.map((job) => (
+              <a key={job.id} href={job.url} target="_blank" rel="noopener noreferrer" className={ROW}>
+                <ListRow
+                  name={job.company}
+                  url={job.url}
+                  title={job.role}
+                  subtitle={`${job.company}${job.location ? ` · ${job.location}` : ""}`}
+                  right={
+                    <div className="flex shrink-0 items-center gap-2">
+                      <DeadlineBadge deadline={job.deadline} />
+                      {job.fitScore != null && <FitScore score={job.fitScore} reasons={job.fitReasons} />}
+                    </div>
+                  }
+                />
+              </a>
+            ))}
           </Card>
         </section>
       )}

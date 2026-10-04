@@ -97,8 +97,9 @@ export function scoreJob(job: FitInput, prefs: JobPrefs, now: Date = new Date())
   if (age <= 7) add(4, "Posted this week");
   else if (age > 60) add(-4, "Posted 2+ months ago");
   if (job.deadline) {
-    const left = (job.deadline.getTime() - now.getTime()) / DAY;
-    if (left >= 0 && left <= 10) add(3, "Deadline soon");
+    // Deadlines are stored at noon UTC on the day; the job stays open through that day.
+    const left = Math.floor((job.deadline.getTime() + DAY / 2 - now.getTime()) / DAY);
+    if (left >= 0 && left <= 7) add(6, left === 0 ? "Closes today" : left === 1 ? "Closes tomorrow" : `Closes in ${left} days`);
   }
 
   if (!text && job.detailsStatus && job.detailsStatus !== "gone") {

@@ -43,6 +43,21 @@ export async function getStaleApplications(now: Date = new Date()) {
   });
 }
 
+/** Good matches you haven't acted on whose deadline is within the week, soonest first. */
+export async function getClosingSoon(now: Date = new Date(), limit = 6) {
+  return prisma.coopPosting.findMany({
+    where: {
+      AND: [
+        { duplicateOfId: null, saved: null, status: { not: "closed" }, fitScore: { gte: 55 } },
+        { deadline: { gte: new Date(now.getTime() - DAY / 2), lte: new Date(now.getTime() + 7 * DAY) } },
+        notBlocked,
+      ],
+    },
+    orderBy: [{ deadline: "asc" }, { fitScore: "desc" }],
+    take: limit,
+  });
+}
+
 /**
  * The best-scoring jobs you haven't saved or applied to yet, from anywhere you'd work. The Jobs page
  * has the full ranked list; this is the short version for the morning.

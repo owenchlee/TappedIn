@@ -5,6 +5,7 @@ import { createDetailCache, fetchPostingDetail, type DetailResult } from "@/lib/
 import { parsePrefs, PREFS_KEY, type JobPrefs } from "@/lib/fit/prefs";
 import { scoreJob } from "@/lib/fit/score";
 import { termsInText } from "@/lib/fit/requirements";
+import { extractDeadline } from "@/lib/fit/deadline";
 import { postingTerms } from "@/lib/sources/enrich";
 import { regionForLocations } from "@/lib/sources/normalize";
 import { plausibleTerms } from "@/lib/terms";
@@ -81,13 +82,16 @@ export async function rescoreJobs(opts: { onlyUnscored?: boolean; ids?: string[]
       const fetched = r.origin !== "manual";
       const terms = fetched ? effectiveTerms(r) : r.terms;
       const region = fetched ? effectiveRegion(r) : r.region;
-      const fit = scoreJob({ ...r, terms, region }, prefs, now);
-      return { id: r.id, terms, region, score: fit.score, reasons: fit.reasons, flags: fit.flags };
+      // A deadline the source didn't give but the posting states. Stored once; never overrides one.
+      const deadline = r.deadline ?? (fetched && r.details ? extractDeadline(r.details, r.postedAt ?? r.firstSeenAt) : null);
+      const fit = scoreJob({ ...r, terms, region, deadline }, prefs, now);
+      return { id: r.id, terms, region, deadline: deadline?.toISOString() ?? null, score: fit.score, reasons: fit.reasons, flags: fit.flags };
     });
     await prisma.$executeRaw`
       UPDATE "CoopPosting" AS c
-      SET "terms" = v.terms, "region" = v.region, "fitScore" = v.score, "fitReasons" = v.reasons, "flags" = v.flags
-      FROM jsonb_to_recordset(${JSON.stringify(values)}::jsonb) AS v(id text, terms text[], region text, score int, reasons text[], flags text[])
+      SET "terms" = v.terms, "region" = v.region, "deadline" = COALESCE(c."deadline", v.deadline::timestamp),
+          "fitScore" = v.score, "fitReasons" = v.reasons, "flags" = v.flags
+      FROM jsonb_to_recordset(${JSON.stringify(values)}::jsonb) AS v(id text, terms text[], region text, deadline text, score int, reasons text[], flags text[])
       WHERE c.id = v.id`;
     done += rows.length;
     cursor = rows[rows.length - 1].id;

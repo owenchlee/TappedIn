@@ -75,6 +75,14 @@ describe("scoreJob", () => {
     expect(scoreJob(job({ details: null, detailsStatus: null }), prefs, now).flags).not.toContain("unreadable");
   });
 
+  it("pushes jobs that close this week up, and says when", () => {
+    const soon = scoreJob(job({ deadline: new Date("2026-10-06T12:00:00Z") }), prefs, now);
+    const later = scoreJob(job({ deadline: new Date("2026-11-20T12:00:00Z") }), prefs, now);
+    expect(soon.score).toBeGreaterThan(later.score);
+    expect(soon.reasons).toContain("+Closes in 2 days");
+    expect(scoreJob(job({ deadline: new Date("2026-10-04T12:00:00Z") }), prefs, now).reasons).toContain("+Closes today");
+  });
+
   it("stays within 0-100", () => {
     const worst = scoreJob(job({ role: "PhD MBA Intern", terms: ["S26"], region: "intl", category: "other", details: "Must be a U.S. citizen. Rising senior. Graduation 2027." }), prefs, now);
     expect(worst.score).toBe(0);
