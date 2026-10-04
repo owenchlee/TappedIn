@@ -7,6 +7,7 @@ import { clsx } from "clsx";
 import { ChevronDown, LayoutGrid, Search, X } from "lucide-react";
 import { PRIMARY_NAV, moreSections, isActive, type NavItem } from "@/components/shell/nav";
 import { ThemeToggle } from "@/components/shell/ThemeToggle";
+import { LogoMark } from "@/components/shell/LogoMark";
 import { CommandPalette, openCommandPalette } from "@/components/shell/CommandPalette";
 import { AutoApplyProvider } from "@/components/autoapply/AutoApplyContext";
 import { LogApplicationButton } from "@/components/applications/LogApplicationButton";
@@ -16,7 +17,7 @@ export type NavCounts = { newJobs: number; dueSoon: number; actionable: number }
 function Logo() {
   return (
     <Link href="/" className="flex shrink-0 items-center gap-2 rounded-full pr-1">
-      <span className="flex size-8 items-center justify-center rounded-[10px] bg-accent text-sm font-bold text-accent-fg">T</span>
+      <LogoMark className="size-8" />
       <span className="text-base font-semibold tracking-tight text-text">TappedIn</span>
     </Link>
   );

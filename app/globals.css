@@ -21,6 +21,10 @@
   --accent-hover: #115e59;
   --accent-soft: #e5f3f0;
   --accent-fg: #ffffff;
+  --logo-tile: #0a0a0a;
+  --logo-face: #ffffff;
+  --logo-top: #525252;
+  --logo-side: #a3a3a3;
   --urgent: #b45309;
   --overdue: #dc2626;
   --new: #059669;
@@ -51,6 +55,10 @@
     --accent-hover: #5eead4;
     --accent-soft: #0f2a27;
     --accent-fg: #04201c;
+    --logo-tile: #fafafa;
+    --logo-face: #0a0a0a;
+    --logo-top: #d4d4d4;
+    --logo-side: #737373;
     --urgent: #fbbf24;
     --overdue: #f87171;
     --new: #34d399;
@@ -81,6 +89,10 @@
   --accent-hover: #5eead4;
   --accent-soft: #0f2a27;
   --accent-fg: #04201c;
+  --logo-tile: #fafafa;
+  --logo-face: #0a0a0a;
+  --logo-top: #d4d4d4;
+  --logo-side: #737373;
   --urgent: #fbbf24;
   --overdue: #f87171;
   --new: #34d399;

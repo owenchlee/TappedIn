@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <style>
+    .tile{fill:#0a0a0a}.face{fill:#fff}.top{fill:#525252}.side{fill:#a3a3a3}
+    @media (prefers-color-scheme: dark){.tile{fill:#fafafa}.face{fill:#0a0a0a}.top{fill:#d4d4d4}.side{fill:#737373}}
+  </style>
+  <rect class="tile" width="64" height="64" rx="15"/>
+  <path class="side" d="M33 29l7-5v25l-7 5z"/>
+  <path class="top" d="M12 19h32l7-5H19z"/>
+  <path class="side" d="M44 19l7-5v10l-7 5z"/>
+  <path class="face" d="M12 19h32v10H33v25H23V29H12z"/>
+</svg>
