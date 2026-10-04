@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { extractRequirements, gradWindow, termsInText, upperYear } from "@/lib/fit/requirements";
+import { extractRequirements, gradWindow, sponsorship, termsInText, upperYear } from "@/lib/fit/requirements";
 import { postingTerms } from "@/lib/sources/enrich";
 
 describe("terms", () => {
@@ -122,6 +122,27 @@ describe("extractRequirements", () => {
     expect(extractRequirements("SWE Intern", "Applicants must be a U.S. citizen due to contract requirements.").usCitizenOnly).toBe(true);
     expect(extractRequirements("SWE Intern", "This role requires an active Secret clearance.").usCitizenOnly).toBe(true);
     expect(extractRequirements("SWE Intern", "We will not sponsor visas for this position.").noSponsorship).toBe(true);
+    expect(extractRequirements("SWE Intern", "Visa sponsorship is available for this position.").sponsors).toBe(true);
+  });
+
+  // Sentences from real postings.
+  it.each([
+    ["Relocation: No relocation\nVISA Sponsorship:\nNo\nTravel Requirements: No Travel Required", "no"],
+    ["Relocation: Not eligible Is Sponsorship Available? No Flex is an Equal Opportunity Employer", "no"],
+    ["Vanguard is not offering sponsorship for this position", "no"],
+    ["This is not a position for which sponsorship will be provided.", "no"],
+    ["Must not require visa sponsorship or have work authorization based on OPT or CPT", "no"],
+    ["No OPT, CPT, STEM/OPT or visa sponsorship now or in future.", "no"],
+    ["If you need immigration sponsorship for your employment, we recommend that you consult with your private immigration attorney.", null],
+    ["Relocation:\nVISA Sponsorship:\nTravel Requirements:", null],
+    ["If applicable, Kodiak may provide visa sponsorship for eligible candidates.", "yes"],
+    ["We do sponsor and take over sponsorship of employment visas for this role.", "yes"],
+    ["Paid Time Off\n- Visa Sponsorship\n- Medical, Dental, and Vision insurance", "yes"],
+    ["Competitive salary and benefits package, with J-1 and F-1 visa sponsorship available.", "yes"],
+    ["Housing including up to 2 pieces of luggage, and handle your J-1 visa sponsorship.", "yes"],
+    ["The company will offer immigration sponsorship for this position, if needed.", "yes"],
+  ] as const)("reads sponsorship: %s", (text, want) => {
+    expect(sponsorship(text)).toBe(want);
   });
 
   it("recognises co-ops and new-grad roles", () => {

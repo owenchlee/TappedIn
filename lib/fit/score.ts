@@ -84,9 +84,15 @@ export function scoreJob(job: FitInput, prefs: JobPrefs, now: Date = new Date())
     flags.push("upper_pref");
     add(-10, "Prefers upper years");
   }
-  if (req.noSponsorship && job.region === "us") {
-    flags.push("no_sponsorship");
-    add(-8, "No visa sponsorship");
+  // A Canadian needs a sponsored visa (usually J-1) for an internship outside Canada.
+  if (job.region === "us" || job.region === "intl") {
+    if (req.noSponsorship) {
+      flags.push("no_sponsorship");
+      add(-12, "No visa sponsorship");
+    } else if (req.sponsors) {
+      flags.push("sponsors");
+      add(6, "Sponsors visas");
+    }
   }
 
   const skills = matchedSkills(`${job.role}\n${text ?? ""}`, prefs.skills);

@@ -67,7 +67,7 @@ describe("scoreJob", () => {
   it("penalises the wrong term and non-tech roles without blocking them", () => {
     const fit = scoreJob(job({ terms: ["F27"], category: "other" }), prefs, now);
     expect(fit.flags).toEqual([]);
-    expect(fit.reasons).toEqual(expect.arrayContaining(["-Not Spring '27", "-Not a tech role"]));
+    expect(fit.reasons).toEqual(expect.arrayContaining(["-Not Summer '27", "-Not a tech role"]));
   });
 
   it("notes when the posting couldn't be read", () => {

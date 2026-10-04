@@ -10,6 +10,10 @@ export const PAGE_SIZE = 40;
 export type JobFilters = {
   q?: string;
   regions: Region[];
+  /** Also include jobs outside those regions whose posting says it sponsors work visas. */
+  plusSponsors?: boolean;
+  /** Only jobs whose posting says it sponsors work visas. */
+  sponsorsOnly?: boolean;
   term?: string;
   category?: JobCategory;
   onlyNew?: boolean;
@@ -24,16 +28,22 @@ export type JobFilters = {
 export function parseJobFilters(sp: Record<string, string | string[] | undefined>): JobFilters {
   const str = (k: string) => (typeof sp[k] === "string" ? (sp[k] as string) : undefined);
   const regionParam = str("region");
-  const regions =
+  // "open": everywhere you can work without a visa, plus jobs abroad that sponsor one.
+  // "sponsor": U.S. and international jobs that sponsor.
+  const regions: Region[] =
     regionParam === "all"
       ? [...REGIONS]
-      : (regionParam ?? "canada,remote")
+      : regionParam === "sponsor"
+        ? ["us", "intl"]
+        : (regionParam === "open" ? "canada,remote" : (regionParam ?? "canada,remote"))
           .split(",")
           .filter((r): r is Region => (REGIONS as readonly string[]).includes(r));
   const category = str("category");
   return {
     q: str("q"),
     regions: regions.length ? regions : ["canada", "remote"],
+    plusSponsors: regionParam === "open",
+    sponsorsOnly: regionParam === "sponsor",
     term: str("term"),
     category: (JOB_CATEGORIES as readonly string[]).includes(category ?? "") ? (category as JobCategory) : undefined,
     onlyNew: str("new") === "1",
@@ -56,7 +66,14 @@ function baseWhere(f: JobFilters, seenAt: Date): Prisma.CoopPostingWhereInput {
     and.push({ OR: [{ deadline: null }, { deadline: { gte: new Date(today.getTime() - 12 * 3_600_000) } }] });
   }
   // Region "canada" includes manual postings with no inferred region (WaterlooWorks entries).
-  and.push({ OR: [{ region: { in: f.regions } }, ...(f.regions.includes("canada") ? [{ region: null }] : [])] });
+  and.push({
+    OR: [
+      { region: { in: f.regions } },
+      ...(f.regions.includes("canada") ? [{ region: null }] : []),
+      ...(f.plusSponsors ? [{ flags: { has: "sponsors" } }] : []),
+    ],
+  });
+  if (f.sponsorsOnly) and.push({ flags: { has: "sponsors" } });
   if (f.q) {
     const contains = { contains: f.q, mode: "insensitive" as const };
     and.push({ OR: [{ company: contains }, { role: contains }, { location: contains }] });

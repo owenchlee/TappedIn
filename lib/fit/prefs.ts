@@ -42,7 +42,7 @@ export const DEFAULT_SKILLS = [
   "pytest",
 ];
 
-/** The next Spring/Summer term from today: when most first co-ops and US internships happen. */
+/** The next Summer (May–Aug) term from today: when most first co-ops and US internships happen. */
 export function defaultTargetTerm(now: Date = new Date()): string {
   let t = nextTerm(termForDate(now));
   while (!t.startsWith("S")) t = nextTerm(t);

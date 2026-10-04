@@ -6,9 +6,12 @@ import { termsFromText } from "@/lib/terms";
 /** Codes stored in CoopPosting.flags. Hard ones mean you can't apply; they're hidden by default. */
 export const HARD_FLAGS = ["grad_year", "upper_year", "grad_degree", "us_citizen", "other_school", "not_internship", "past_term", "gone"] as const;
 export const SOFT_FLAGS = ["upper_pref", "no_sponsorship", "unreadable"] as const;
+/** Good news worth filtering on; never lowers a score. */
+export const INFO_FLAGS = ["sponsors"] as const;
 export type HardFlag = (typeof HARD_FLAGS)[number];
 export type SoftFlag = (typeof SOFT_FLAGS)[number];
-export type Flag = HardFlag | SoftFlag;
+export type InfoFlag = (typeof INFO_FLAGS)[number];
+export type Flag = HardFlag | SoftFlag | InfoFlag;
 
 export type Requirements = {
   /** Graduation years the posting accepts, inclusive; null bound = open-ended. */
@@ -21,6 +24,8 @@ export type Requirements = {
   gradDegreeOnly: string | null;
   usCitizenOnly: boolean;
   noSponsorship: boolean;
+  /** Says it sponsors work visas (J-1, "visa sponsorship is available"): what a Canadian needs for a U.S. job. */
+  sponsors: boolean;
   /** Only students of one named school ("University of Illinois Urbana Champaign"). */
   otherSchool: string | null;
   /** A co-op, or written for co-op students (4/8/12-month terms, "registered co-op program"). */
@@ -125,7 +130,38 @@ const US_CITIZEN = [
   /\b(active |current |obtain (a|an)? ?|eligib(le|ility) (for|to obtain) (a|an)? ?)(u\.?\s?s\.? )?(government |security |secret |top secret |ts\/sci )+clearance\b|\b(secret|top secret|ts\/sci) clearance\b/i,
   /\b(itar|export control)\b[^.\n]{0,120}\b(u\.?\s?s\.? person|citizen|permanent resident)/i,
 ];
-const NO_SPONSOR = /\b(will not|cannot|does not|unable to|no) (provide |offer )?(visa )?sponsor(ship)?\b|\bwithout (the need for )?(current or future )?(visa )?sponsorship\b/i;
+// Sponsorship is read one sentence at a time. Any negation in a sentence about it means "no"
+// ("VISA Sponsorship: No", "not a position for which sponsorship will be provided"), even at the cost
+// of the odd real yes; otherwise it takes a clear offer ("Visa sponsorship is available", "we do sponsor").
+const ABOUT_SPONSOR = /\bsponsor|\bvisas?\b|\bj-?1\b/i;
+const SPONSOR_NO = /\b(no|not|never|cannot|without|unable|ineligible)\b|n't\b/i;
+const SPONSOR_YES = new RegExp(
+  [
+    String.raw`\bsponsorship\b[^.]{0,40}\b(available|provided|offered|possible)\b`,
+    String.raw`\b(will|can|may|do|does)\b (also )?(provide |offer |handle |support )?(visa |immigration |j-?1 )*sponsor`,
+    String.raw`\bsponsorship for (qualified|eligible|international)`,
+    String.raw`\b(handle|including|includes|support) (your )?(j-?1 |visa |immigration )*(visa )?sponsorship`,
+    String.raw`\btake over sponsorship\b`,
+    String.raw`\bopen to (international|j-?1|candidates (who )?(require|need))`,
+    String.raw`\boffer (cpt|opt|h-?1b|visa)`,
+    String.raw`\bj-?1\b`,
+    String.raw`^[-*\s]*(visa|immigration) sponsorship\s*$`, // a line in a benefits list (not "VISA Sponsorship:")
+  ].join("|"),
+  "i",
+);
+
+/** Whether the posting says it sponsors work visas: "yes", "no", or null when it doesn't say. */
+export function sponsorship(text: string): "yes" | "no" | null {
+  // Job-board fields put the answer on the next line or after a question mark: "Sponsorship:\nNo".
+  const joined = text.replace(/([:?])\s*\n?\s*(?=(yes|no)\b)/gi, ": ");
+  let yes = false;
+  for (const s of sentences(joined)) {
+    if (!ABOUT_SPONSOR.test(s)) continue;
+    if (SPONSOR_NO.test(s)) return "no";
+    if (SPONSOR_YES.test(s)) yes = true;
+  }
+  return yes ? "yes" : null;
+}
 
 const COOP = /\bco-?op\b|\b(4|four|8|eight|12|twelve|16|sixteen)[- ]month\b|\bregistered (in a )?co-?op\b|\bwaterloo\b/i;
 const NOT_INTERNSHIP = /\b(new grad(uate)?s?|entry[- ]level|graduate (program(me)?|scheme)|full[- ]time (role|position)|early career program)\b(?![^()]*intern)/i;
@@ -153,13 +189,15 @@ export function extractRequirements(rawTitle: string, rawText: string | null): R
   const body = normalizeText(rawText ?? "");
   const all = `${title}\n${body}`;
   const { upperYear: upper, earlyFriendly } = upperYear(all);
+  const visa = sponsorship(all);
   return {
     gradWindow: gradWindow(all),
     upperYear: upper,
     earlyFriendly,
     gradDegreeOnly: gradDegreeOnly(title, body),
     usCitizenOnly: US_CITIZEN.some((re) => re.test(all)),
-    noSponsorship: NO_SPONSOR.test(all),
+    noSponsorship: visa === "no",
+    sponsors: visa === "yes",
     otherSchool: body ? otherSchool(body) : null,
     coop: COOP.test(title) || /\b(registered|enrolled) in (a |an )?(\w+ )?co-?op\b|\bco-?op (program|students?|term|placement)\b|\b(4|four|8|eight)[- ]month\b/i.test(body),
     notInternship: !/\b(intern(ship)?|co-?op|student|summer analyst)\b/i.test(title) && NOT_INTERNSHIP.test(title),

@@ -22,7 +22,9 @@ export const dynamic = "force-dynamic";
 
 const REGION_PRESETS = [
   { value: undefined, label: "Canada + remote" },
+  { value: "open", label: "Canada + U.S. sponsors" },
   { value: "canada", label: "Canada" },
+  { value: "sponsor", label: "U.S. jobs that sponsor visas" },
   { value: "us", label: "US" },
   { value: "all", label: "Everywhere" },
 ] as const;

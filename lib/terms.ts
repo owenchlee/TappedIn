@@ -7,7 +7,8 @@
 export type Season = "F" | "W" | "S";
 
 const SEASON_ORDER: Record<Season, number> = { W: 0, S: 1, F: 2 };
-const SEASON_NAMES: Record<Season, string> = { F: "Fall", W: "Winter", S: "Spring" };
+// UW calls May–Aug the "Spring" term, but employers (and Owen) call it Summer; show what they say.
+const SEASON_NAMES: Record<Season, string> = { F: "Fall", W: "Winter", S: "Summer" };
 
 export function termCode(season: Season, year: number): string {
   return `${season}${String(year % 100).padStart(2, "0")}`;

@@ -23,7 +23,7 @@ export function FitScore({ score, reasons }: { score: number; reasons: string[] 
 }
 
 /**
- * The reasons behind a job's score, e.g. "✓ Spring '27 · ✓ In Canada · ✗ For grads 2027–2028".
+ * The reasons behind a job's score, e.g. "✓ Summer '27 · ✓ In Canada · ✗ For grads 2027–2028".
  * Blockers (you can't apply) show in red first.
  */
 export function FitReasons({ reasons, blocked, max = 4 }: { reasons: string[]; blocked: boolean; max?: number }) {
