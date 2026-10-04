@@ -2,6 +2,7 @@ import { prisma } from "@/lib/db";
 import { getSetting } from "@/lib/data/settings";
 import type { NavCounts } from "@/components/shell/AppShell";
 import { ACTIVE_STAGES } from "@/lib/types";
+import { notBlocked } from "@/lib/data/jobs";
 
 const DAY = 86_400_000;
 
@@ -18,7 +19,7 @@ export async function getNavCounts(): Promise<NavCounts> {
   const seenAt = await jobsSeenAt();
 
   const [newJobs, dueSoon, nextSteps] = await Promise.all([
-    prisma.coopPosting.count({ where: { duplicateOfId: null, firstSeenAt: { gt: seenAt }, status: { not: "closed" } } }),
+    prisma.coopPosting.count({ where: { AND: [{ duplicateOfId: null, firstSeenAt: { gt: seenAt }, status: { not: "closed" } }, notBlocked] } }),
     prisma.savedItem.count({
       where: {
         status: { in: [...ACTIVE_STAGES] },

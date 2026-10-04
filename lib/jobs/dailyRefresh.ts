@@ -108,7 +108,7 @@ export type DailyRefreshResult = {
 
 // The Vercel function gets 300s (app/api/cron/refresh). Reading postings fills whatever the sources
 // leave, minus a margin for scoring and bookkeeping; the backlog carries over to the next day.
-const REFRESH_BUDGET_MS = 270_000;
+const REFRESH_BUDGET_MS = 230_000; // leaves ~70s for the final re-score and bookkeeping
 const MAX_DETAILS_MS = 180_000;
 
 /**
