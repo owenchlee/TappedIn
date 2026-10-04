@@ -1,15 +1,18 @@
 # Morning report: 2026-10-03 overnight run
 
-Branch `overhaul`, every commit pushed. `npm test` (87 tests), `npm run lint` and `npm run build` pass on every commit.
+Branch `overhaul`, every commit pushed. `npm test` (93 tests), `npm run lint` and `npm run build` pass on every commit.
+
+**Round 2 (after you asked to test everything):** the local DB was started and everything below marked
+"round 2" was run against it and in the real app in Chrome. Three more real bugs were found and fixed.
 
 ## Do these before your first application
 
 1. **Fill the blanks on the Profile page** (`/profile`): phone, plus the three eligibility answers
    (Canada / US / sponsorship). They're blank, so the filler leaves those questions for you on every
    form. That's safe, but slower.
-2. **Start the local DB**: `npm run db:dev`, then `npx prisma migrate deploy` and `npm run cron:once`. The
-   safety check blocked me from starting it, so the tracker side wasn't run against a live DB (see
-   "Not tested").
+2. The local DB is running (`npm run db:dev`), migrated, and refreshed with today's jobs. If it's off
+   when you start, run `npm run db:dev`. It accepts one connection at a time, so close any other script
+   using it before starting `npm run dev`.
 3. After you click Submit on a site, click **"I submitted it"** on the apply status page. That's what
    moves the job to Applied. The runner never submits and can't tell when you have.
 
@@ -22,7 +25,9 @@ Branch `overhaul`, every commit pushed. `npm test` (87 tests), `npm run lint` an
 | Full auto-apply, PM + US citizenship | Same, on a PM variant that requires U.S. citizenship and asks the country-ambiguous questions | PM base picked, citizenship warning shown, optional cover letter skipped, both eligibility questions left for you. $0.50 |
 | Resume keeps your style | Compiled each Overleaf base with MiKTeX and compared embedded fonts plus a visual side by side with the tailored PDFs | Same fonts (CM Super, same sizes), same layout, one page |
 | Real ATS forms | Headless scan + **fake-data** fill of live Anduril (Greenhouse), Aquatic (Greenhouse), Ellipsis/Mercor (Ashby), Palantir (Lever) Summer 2027 postings. No uploads, nothing submitted, tabs closed | Found 10+ bugs (below). After fixes every mapped dropdown and field holds the right value |
-| Tracking | Code review of "I submitted it" → `trackPosting` → Applied (+ timeline event, `appliedAt`, resume version) | Correct for postings from the Jobs list; **pasted-link jobs weren't tracked at all**: fixed |
+| Tracking (round 2) | In the real app: "I applied" on a Jobs row; auto-apply started from the Apply page → status page → "I submitted it"; stage change on the board. Checked the DB rows each time | All work: Applied with `appliedAt`, timeline event, channel and resume version; card moves to Interview. **Pasted-link jobs weren't tracked before**: fixed and verified. Test records deleted afterwards |
+| Jobs page (round 2) | Real app in Chrome: region/role filters, Applied badge, promoted jobs visible | Works. Software filter: 195 jobs in Canada + remote |
+| Full refresh into the DB (round 2) | `npm run cron:once` twice, then `coverage:check --db` (now checks each role is *visible*, not just stored) | 12/13 sources OK on the first run; TD fixed after (bug 11). Every in-region SWE / AI-ML / PM role visible |
 
 ### Coverage numbers (live feed, 2026-10-03)
 
@@ -61,6 +66,21 @@ is up to also compare against what's stored.
 7. Lever's "I do not want to answer" wasn't recognised as declining.
 8. Pasted-link applications weren't added to the tracker when you marked them submitted.
 
+9. **(round 2) Distinct jobs merged into one.** URL keys dropped job-ID query params, so all 8 Stripe
+   `/jobs/search?gh_jid=…` internships became one job (also Waymo, Pinterest, Zipline, Tower, Greenhouse
+   embeds `?token=`, Taleo `?job=`): 98 active feed rows. Keys now keep those params. Stored rows are
+   re-keyed in place once (no churn, applications stay attached; your Vercel DB gets this on its next
+   refresh automatically). 65 wrongly hidden jobs reappeared locally.
+10. **(round 2) Open jobs hidden behind closed copies.** When the list that "owned" a job dropped it (e.g.
+   the Canadian list dropping 3 RBC Global Equities co-ops), the job vanished even though SimplifyJobs
+   still listed it as active. The live copy is now promoted (and any application moves with it). The
+   vanshb03 list is marked `keepsClosedJobs`: it lags SimplifyJobs, so it can't keep a closed job alive
+   (that would have resurrected 10 closed Amex / Microsoft / Snowflake postings).
+11. **(round 2) Workday stopped after 40 jobs and dropped multi-location jobs.** Workday says
+   `total: 0` after page 1, so RBC, TD, Ciena and NVIDIA stopped at 2 pages; and "2 Locations" jobs
+   couldn't be placed (every TD Canada co-op, so TD failed with zero results). Fixed: RBC +6,
+   NVIDIA +12, TD healthy again.
+
 ## New safety checks (enforced in code, not just the prompt)
 
 - **No invented facts on the resume** (`lib/autoapply/facts.ts`): every number, skill/tool and
@@ -91,8 +111,9 @@ is up to also compare against what's stored.
 - **Live forms were filled only with fake data, headless, with no uploads and no submit.** Uploading a
   résumé to Greenhouse sends it to the company, so file inputs were checked by label only.
 - **Left as is:** your resume templates, `profile.json`, `experience.md`, and the two old Northwind test
-  runs. My two test runs (`20261003160259-…`, `20261003160625-…`) are also on `/apply` if you want to look
-  at the output; delete those folders under `private/applications/` when done.
+  runs from Sept 29. My own test runs and test tracker records were deleted.
+- **Another session was redesigning the UI at the same time.** I never staged its files (app pages,
+  components, globals.css) and verified every one of my commits by building it in a clean worktree.
 
 ## Worth a look
 
@@ -105,7 +126,16 @@ is up to also compare against what's stored.
 
 ## Not tested
 
-- Anything needing the database: refresh into Postgres, `coverage:check --db`, the Jobs/Applications UI
-  in a browser, and "I submitted it" against a real row. The code path was reviewed, and the pasted-link
-  gap was fixed.
-- Workday and other login-walled forms (they need an account, which I didn't create).
+- Filling a Workday (or any login-walled) application form: they need an account, which I didn't create.
+- Auto-apply started from a real posting's "Auto-apply" button on the Jobs page. That would upload your
+  résumé to a real company. Same runner and same tracking code as the tested paths; only the URL differs.
+- TD still has 9 older postings that may be closed: TD's board now lists only 1 Canadian co-op, and the
+  "sudden drop = broken source" guard won't close them automatically. Mark them closed if you see them.
+
+## Known quirks
+
+- In `next dev`, the first visit to a page that hasn't compiled yet can briefly show the previous page.
+  The server returns the right page (checked with curl), and in-app navigation is fine. Reload if it
+  happens.
+- Co-op term questions ("Which term are you applying for?") are sometimes left for you when the role
+  title doesn't name the term.
