@@ -51,6 +51,27 @@ export function nextTerm(code: string): string {
   return termCode("W", t.year + 1);
 }
 
+/** The first moment after a term ends: May 1 for Winter, Sep 1 for Spring, Jan 1 for Fall. */
+export function termEnd(code: string): Date | null {
+  const t = parseTermCode(code);
+  if (!t) return null;
+  if (t.season === "W") return new Date(Date.UTC(t.year, 4, 1));
+  if (t.season === "S") return new Date(Date.UTC(t.year, 8, 1));
+  return new Date(Date.UTC(t.year + 1, 0, 1));
+}
+
+/**
+ * Drops terms that were already over when the job was posted. SimplifyJobs tags hundreds of
+ * September 2026 postings "Winter 2026" (a term that ended in April 2026); nearly all are 2027 roles.
+ */
+export function plausibleTerms(terms: string[], postedAt: Date | null | undefined): string[] {
+  if (!postedAt) return terms;
+  return terms.filter((t) => {
+    const end = termEnd(t);
+    return !end || end > postedAt;
+  });
+}
+
 /** The next `count` terms starting at `from` (inclusive). */
 export function termRange(from: string, count: number): string[] {
   const out: string[] = [];

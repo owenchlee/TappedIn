@@ -3,7 +3,7 @@ import type { Prisma } from "@/lib/generated/prisma/client";
 import type { SavedCategory, SavedStatus } from "@/lib/types";
 
 const include = {
-  coopPosting: true,
+  coopPosting: { omit: { details: true } },
   organization: true,
   events: { orderBy: { at: "asc" } },
   _count: { select: { contacts: true } },

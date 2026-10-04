@@ -31,7 +31,7 @@ export default async function JobsPage({ searchParams }: PageProps<"/jobs">) {
   const sp = await searchParams;
   const f = parseJobFilters(sp);
   const seenAt = await jobsSeenAt();
-  const [{ items, total, newCount, pages }, terms, lastRun] = await Promise.all([
+  const [{ items, total, newCount, blockedCount, pages }, terms, lastRun] = await Promise.all([
     listJobs(f, seenAt),
     listJobTerms(),
     prisma.jobState.findUnique({ where: { key: "daily-refresh" } }),
@@ -46,6 +46,7 @@ export default async function JobsPage({ searchParams }: PageProps<"/jobs">) {
     new: str("new"),
     tracked: str("tracked"),
     closed: str("closed"),
+    blocked: str("blocked"),
     sort: str("sort"),
   };
   const href = (changes: Record<string, string | undefined>) => withParams("/jobs", current, { page: undefined, ...changes });
@@ -59,7 +60,7 @@ export default async function JobsPage({ searchParams }: PageProps<"/jobs">) {
         title="Jobs"
         description={
           <>
-            Every internship and co-op we could find, each listed once.
+            Every internship and co-op we could find, each listed once, best matches for you first.
             {lastRun?.lastRunAt && <span className="text-muted-2"> Updated {relativeTime(lastRun.lastRunAt)}.</span>}
           </>
         }
@@ -104,7 +105,8 @@ export default async function JobsPage({ searchParams }: PageProps<"/jobs">) {
           <FilterSelect
             label="Sort"
             options={[
-              { href: href({ sort: undefined }), label: "Newest first", active: f.sort === "new" },
+              { href: href({ sort: undefined }), label: "Best match", active: f.sort === "best" },
+              { href: href({ sort: "new" }), label: "Newest first", active: f.sort === "new" },
               { href: href({ sort: "deadline" }), label: "Deadline first", active: f.sort === "deadline" },
             ]}
           />
@@ -119,6 +121,20 @@ export default async function JobsPage({ searchParams }: PageProps<"/jobs">) {
           <Link href="/jobs" scroll={false} className="font-medium text-accent hover:text-accent-hover">
             Clear filters
           </Link>
+        )}
+        {f.showBlocked ? (
+          <Link href={href({ blocked: undefined })} scroll={false} className="text-muted hover:text-text">
+            Hide ones I can&apos;t apply to
+          </Link>
+        ) : (
+          blockedCount > 0 && (
+            <span className="text-muted-2">
+              <span className="tabular-nums">{blockedCount.toLocaleString()}</span> hidden: wrong grad year, upper years, PhD or U.S. citizens only.{" "}
+              <Link href={href({ blocked: "1" })} scroll={false} className="text-muted underline-offset-2 hover:text-text hover:underline">
+                Show them
+              </Link>
+            </span>
+          )
         )}
         <span className="ml-auto flex gap-4">
           <Link href={href({ tracked: f.hideTracked ? undefined : "hide" })} scroll={false} className="text-muted hover:text-text">

@@ -10,6 +10,7 @@ import { rekeyPostingsIfNeeded } from "@/lib/sources/rekey";
 import { promoteLiveDuplicates } from "@/lib/sources/promote";
 import { importMlhHackathons, type HackathonImportSummary } from "@/lib/hackathons/mlh";
 import { runOrgWatch, type OrgWatchSummary } from "@/lib/watch/orgWatch";
+import { refreshDetails, rescoreJobs, type DetailsSummary } from "@/lib/fit/store";
 import type { LoadedSource } from "@/lib/sources/types";
 
 export const JOB_KEY = "daily-refresh";
@@ -102,7 +103,13 @@ export type DailyRefreshResult = {
   sources: SourceRunSummary[];
   hackathons: HackathonImportSummary | null;
   watch: OrgWatchSummary | null;
+  details?: DetailsSummary | null;
 };
+
+// The Vercel function gets 300s (app/api/cron/refresh). Reading postings fills whatever the sources
+// leave, minus a margin for scoring and bookkeeping; the backlog carries over to the next day.
+const REFRESH_BUDGET_MS = 270_000;
+const MAX_DETAILS_MS = 180_000;
 
 /**
  * The single daily entry point (Vercel Cron → /api/cron/refresh, or the local node-cron scheduler).
@@ -115,6 +122,7 @@ export async function runDailyRefresh(): Promise<DailyRefreshResult> {
   }
 
   return withRefreshLock(async () => {
+    const startedAt = Date.now();
     // Must run before any diff: stale keys would mark every re-keyed posting missed and re-create it.
     await rekeyPostingsIfNeeded();
     const sources = await listEnabledSources();
@@ -136,6 +144,19 @@ export async function runDailyRefresh(): Promise<DailyRefreshResult> {
       return null;
     });
 
+    // Score new jobs first so the best matches get read first, then read postings and re-score all
+    // (scores depend on the date: freshness, past terms). Failures here never lose the fetch above.
+    const details = await (async () => {
+      await rescoreJobs({ onlyUnscored: true });
+      const budgetMs = Math.min(MAX_DETAILS_MS, REFRESH_BUDGET_MS - (Date.now() - startedAt));
+      const summary = budgetMs > 10_000 ? await refreshDetails({ budgetMs }) : null;
+      await rescoreJobs();
+      return summary;
+    })().catch((err) => {
+      console.error("[details] posting details failed:", err);
+      return null;
+    });
+
     const now = new Date();
     const anyFailed = summaries.some((s) => !s.ok) || !hackathons.ok;
     await prisma.jobState.upsert({
@@ -144,7 +165,7 @@ export async function runDailyRefresh(): Promise<DailyRefreshResult> {
       update: { lastRunAt: now, ...(anyFailed ? {} : { lastOkAt: now }), lastError: anyFailed ? "one or more sources failed" : null },
     });
 
-    return { sources: summaries, hackathons, watch };
+    return { sources: summaries, hackathons, watch, details };
   });
 }
 
@@ -166,6 +187,7 @@ export async function runSourceByKey(key: string): Promise<SourceRunSummary> {
     const row = await prisma.companySource.findUniqueOrThrow({ where: { key } });
     const summary = await runOneSource(loadedSourceFromRow(row));
     await promoteLiveDuplicates();
+    await rescoreJobs({ onlyUnscored: true });
     return summary;
   });
 }

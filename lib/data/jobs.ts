@@ -3,6 +3,7 @@ import type { Prisma } from "@/lib/generated/prisma/client";
 import { dateInputToStorage, storageToDateInput } from "@/lib/deadline";
 import { JOB_CATEGORIES, REGIONS, type JobCategory, type Region } from "@/lib/types";
 import { termForDate, termSortKey } from "@/lib/terms";
+import { HARD_FLAGS } from "@/lib/fit/requirements";
 
 export const PAGE_SIZE = 40;
 
@@ -14,7 +15,9 @@ export type JobFilters = {
   onlyNew?: boolean;
   hideTracked?: boolean;
   showClosed?: boolean;
-  sort: "new" | "deadline";
+  /** Also list jobs you can't apply to (wrong graduating class, PhD-only, U.S. citizens only...). */
+  showBlocked?: boolean;
+  sort: "best" | "new" | "deadline";
   page: number;
 };
 
@@ -36,10 +39,14 @@ export function parseJobFilters(sp: Record<string, string | string[] | undefined
     onlyNew: str("new") === "1",
     hideTracked: str("tracked") === "hide",
     showClosed: str("closed") === "1",
-    sort: str("sort") === "deadline" ? "deadline" : "new",
+    showBlocked: str("blocked") === "1",
+    sort: str("sort") === "deadline" ? "deadline" : str("sort") === "new" ? "new" : "best",
     page: Math.max(1, Number(str("page") ?? 1) || 1),
   };
 }
+
+/** Jobs with no hard flag. The NOT-hasSome form keeps rows whose flags are empty. */
+export const notBlocked: Prisma.CoopPostingWhereInput = { NOT: { flags: { hasSome: [...HARD_FLAGS] } } };
 
 function baseWhere(f: JobFilters, seenAt: Date): Prisma.CoopPostingWhereInput {
   const today = dateInputToStorage(storageToDateInput(new Date()));
@@ -58,6 +65,7 @@ function baseWhere(f: JobFilters, seenAt: Date): Prisma.CoopPostingWhereInput {
   if (f.category) and.push({ category: f.category });
   if (f.onlyNew) and.push({ firstSeenAt: { gt: seenAt } });
   if (f.hideTracked) and.push({ saved: null });
+  if (!f.showBlocked) and.push(notBlocked);
   return { AND: and };
 }
 
@@ -67,21 +75,25 @@ const include = {
   source: { select: { name: true } },
 } satisfies Prisma.CoopPostingInclude;
 
-export type JobRow = Prisma.CoopPostingGetPayload<{ include: typeof include }>;
+export type JobRow = Prisma.CoopPostingGetPayload<{ include: typeof include; omit: { details: true } }>;
 
 export async function listJobs(f: JobFilters, seenAt: Date) {
   const where = baseWhere(f, seenAt);
   const orderBy: Prisma.CoopPostingOrderByWithRelationInput[] =
     f.sort === "deadline"
       ? [{ deadline: { sort: "asc", nulls: "last" } }, { firstSeenAt: "desc" }]
-      : [{ firstSeenAt: "desc" }, { postedAt: { sort: "desc", nulls: "last" } }];
+      : f.sort === "new"
+        ? [{ firstSeenAt: "desc" }, { postedAt: { sort: "desc", nulls: "last" } }]
+        : [{ fitScore: { sort: "desc", nulls: "last" } }, { firstSeenAt: "desc" }];
 
-  const [items, total, newCount] = await Promise.all([
+  const [items, total, newCount, blockedCount] = await Promise.all([
     prisma.coopPosting.findMany({ where, include, orderBy, skip: (f.page - 1) * PAGE_SIZE, take: PAGE_SIZE }),
     prisma.coopPosting.count({ where }),
     prisma.coopPosting.count({ where: baseWhere({ ...f, onlyNew: true }, seenAt) }),
+    // How many the eligibility filter is hiding right now, so the page can say so.
+    f.showBlocked ? Promise.resolve(0) : prisma.coopPosting.count({ where: { AND: [baseWhere({ ...f, showBlocked: true }, seenAt), { NOT: notBlocked }] } }),
   ]);
-  return { items, total, newCount, pages: Math.max(1, Math.ceil(total / PAGE_SIZE)) };
+  return { items, total, newCount, blockedCount, pages: Math.max(1, Math.ceil(total / PAGE_SIZE)) };
 }
 
 /** Upcoming terms that postings are actually tagged with, soonest first (for the term filter). */

@@ -15,7 +15,8 @@
     "test": "vitest run",
     "vercel-build": "prisma generate && prisma migrate deploy && tsx prisma/seed.ts && next build",
     "db:dev": "prisma dev --name tappedin --detach",
-    "coverage:check": "tsx scripts/coverage-check.ts"
+    "coverage:check": "tsx scripts/coverage-check.ts",
+    "jobs:details": "tsx scripts/job-details.ts"
   },
   "dependencies": {
     "@prisma/adapter-pg": "^7.10.0",

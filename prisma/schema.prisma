@@ -42,6 +42,17 @@ model CoopPosting {
   disappearedAt  DateTime?
   dismissedAt    DateTime?
 
+  // The posting's own text, read from the ATS (lib/details), so the app can tell who a job is for.
+  details       String?
+  detailsStatus String? // ok | gone | error | unsupported
+  detailsAt     DateTime?
+  detailsError  String?
+
+  // How well the job suits you (lib/fit), recomputed after every refresh and when preferences change.
+  fitScore   Int?
+  fitReasons String[] @default([]) // "+Spring '27", "-Juniors and seniors"
+  flags      String[] @default([]) // see FLAG_LABELS in lib/fit/requirements.ts
+
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 
@@ -56,6 +67,7 @@ model CoopPosting {
   @@index([titleKey])
   @@index([duplicateOfId])
   @@index([region])
+  @@index([fitScore])
 }
 
 model Organization {

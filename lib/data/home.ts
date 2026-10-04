@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/db";
 import { isOrgApplicable } from "@/lib/data/orgs";
 import { ACTIVE_STAGES } from "@/lib/types";
+import { notBlocked } from "@/lib/data/jobs";
 
 const DAY = 86_400_000;
 
@@ -42,16 +43,20 @@ export async function getStaleApplications(now: Date = new Date()) {
   });
 }
 
-export async function getFreshJobs(since: Date, limit = 6) {
+/**
+ * The best-scoring jobs you haven't saved or applied to yet, from anywhere you'd work. The Jobs page
+ * has the full ranked list; this is the short version for the morning.
+ */
+export async function getTopMatches(limit = 6) {
   return prisma.coopPosting.findMany({
     where: {
-      duplicateOfId: null,
-      saved: null,
-      status: { not: "closed" },
-      firstSeenAt: { gt: since },
-      OR: [{ region: { in: ["canada", "remote"] } }, { region: null }],
+      AND: [
+        { duplicateOfId: null, saved: null, status: { not: "closed" }, fitScore: { gte: 50 } },
+        { OR: [{ deadline: null }, { deadline: { gte: new Date(Date.now() - DAY / 2) } }] },
+        notBlocked,
+      ],
     },
-    orderBy: [{ postedAt: { sort: "desc", nulls: "last" } }, { firstSeenAt: "desc" }],
+    orderBy: [{ fitScore: { sort: "desc", nulls: "last" } }, { firstSeenAt: "desc" }],
     take: limit,
   });
 }

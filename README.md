@@ -57,6 +57,30 @@ A posting is **New** until you've visited the Jobs page after it appeared. A pos
 **possibly closed** only after it's missing from two consecutive successful fetches; a run that
 suddenly returns zero (or a fraction of) postings is treated as a broken source, not mass closure.
 
+### Best match first
+
+Each refresh reads the text of every new posting (`lib/details`): the public APIs of Greenhouse,
+Lever, Ashby, SmartRecruiters, Workday, Workable and Oracle Cloud, or the page itself (JSON-LD, then
+the page text). When the ATS says a posting no longer exists, it's closed straight away, without
+waiting for the lists to drop it. A tracked job is never closed this way; it gets a "taken down" note.
+
+`lib/fit` then reads who the job is for and scores it 0–100 against **Settings → What you're looking
+for** (terms, role types, graduation year, resume skills). Postings you can't apply to are hidden
+unless you ask for them:
+
+| Hidden when the posting… | Example |
+| --- | --- |
+| is for another graduating class | "Graduation date between December 2027 and June 2028" |
+| wants upper years | "rising senior", "penultimate or final year", "completed sophomore year" |
+| is for grad students | PhD / Master's / MBA in the title, "Must be enrolled in a PhD program" |
+| needs U.S. citizenship or a clearance | "Must be a U.S. citizen", "active Secret clearance", ITAR |
+| is for one school's students | "currently enrolled at the University of Illinois…" |
+| is over | its only term already started, or the ATS took it down |
+
+Each row shows its score and the reasons ("✓ Spring '27 · ✓ Open to 1st/2nd years · – No visa
+sponsorship"). The daily refresh reads for up to 3 minutes; `npm run jobs:details` reads the whole
+backlog at once (and `-- --rescore` only re-scores, after changing the rules).
+
 ## Running locally
 
 ```bash
@@ -68,6 +92,7 @@ npm run dev                 # seeds data/*.json on boot
 npm run cron:once           # optional: fetch every source now
 npm test
 npm run coverage:check   # does the Jobs pipeline keep every Summer 2027 SWE/AI-ML/PM role from SimplifyJobs?
+npm run jobs:details     # read every posting's text and score it (the daily refresh does this gradually)
 ```
 
 ## Deploying (Vercel + Postgres)

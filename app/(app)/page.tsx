@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { ArrowRight, CalendarDays, Sparkles } from "lucide-react";
 import { getAgenda, getOverdue } from "@/lib/data/agenda";
-import { getFreshJobs, getOpenOpportunities, getStaleApplications, getTodayStats } from "@/lib/data/home";
+import { getTopMatches, getOpenOpportunities, getStaleApplications, getTodayStats } from "@/lib/data/home";
 import { jobsSeenAt } from "@/lib/data/nav";
 import { listUnseenSignals } from "@/lib/data/orgs";
 import { DismissSignalButton } from "@/components/DismissSignalButton";
@@ -13,6 +13,7 @@ import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { SectionTitle } from "@/components/ui/PageHeader";
 import { DeadlineBadge } from "@/components/DeadlineBadge";
+import { FitScore } from "@/components/jobs/FitSummary";
 import { formatDate } from "@/lib/deadline";
 import { relativeTime } from "@/lib/format";
 import { nextTerm, termForDate, termLabel, termShortLabel } from "@/lib/terms";
@@ -74,7 +75,7 @@ export default async function HomePage() {
     getAgenda(new Date(now.getTime() - DAY / 2), new Date(now.getTime() + 14 * DAY)),
     getOverdue(now),
     getStaleApplications(now),
-    getFreshJobs(seenAt),
+    getTopMatches(),
     getOpenOpportunities(now),
     listUnseenSignals(),
   ]);
@@ -153,14 +154,14 @@ export default async function HomePage() {
       )}
 
       <section>
-        <SectionTitle action={<SeeAll href="/jobs?new=1">All new jobs</SeeAll>}>New jobs for you</SectionTitle>
+        <SectionTitle action={<SeeAll href="/jobs?region=all">All matches</SeeAll>}>Best matches for you</SectionTitle>
         {fresh.length === 0 ? (
           <Card className="flex flex-col items-center gap-1.5 py-10 text-center">
             <span className="mb-1 flex size-11 items-center justify-center rounded-full bg-accent-soft text-accent">
               <Sparkles className="size-5" />
             </span>
             <p className="text-sm font-medium">You&apos;re all caught up</p>
-            <p className="text-sm text-muted">No new postings since your last visit.</p>
+            <p className="text-sm text-muted">You&apos;ve saved or applied to every good match. New postings arrive each morning.</p>
           </Card>
         ) : (
           <Card className="space-y-0.5 p-2">
@@ -172,13 +173,19 @@ export default async function HomePage() {
                   title={job.role}
                   subtitle={`${job.company}${job.location ? ` · ${job.location}` : ""}`}
                   right={
-                    <div className="hidden shrink-0 items-center gap-2 sm:flex">
+                    <div className="flex shrink-0 items-center gap-2">
+                      {job.firstSeenAt > seenAt && (
+                        <Badge variant="new" className="hidden sm:inline-flex">
+                          New
+                        </Badge>
+                      )}
                       {job.terms.slice(0, 1).map((t) => (
-                        <Badge key={t} variant="accent">
+                        <Badge key={t} variant="accent" className="hidden sm:inline-flex">
                           {termShortLabel(t)}
                         </Badge>
                       ))}
-                      <span className="text-xs text-muted-2">{relativeTime(job.firstSeenAt)}</span>
+                      <span className="hidden text-xs text-muted-2 sm:inline">{relativeTime(job.firstSeenAt)}</span>
+                      {job.fitScore != null && <FitScore score={job.fitScore} reasons={job.fitReasons} />}
                     </div>
                   }
                 />

@@ -9,6 +9,8 @@ import { ApplyButton } from "@/components/autoapply/ApplyButton";
 import { Badge } from "@/components/ui/Badge";
 import { StatusPill } from "@/components/StatusPill";
 import { DeadlineBadge } from "@/components/DeadlineBadge";
+import { FitReasons, FitScore } from "@/components/jobs/FitSummary";
+import { HARD_FLAGS } from "@/lib/fit/requirements";
 import { toggleSave } from "@/actions/saved";
 import { trackPosting } from "@/actions/applications";
 import { resolveDisappeared } from "@/actions/coop";
@@ -22,12 +24,13 @@ export function JobRow({ job, isNew }: { job: JobRowData; isNew: boolean }) {
   const [isPending, startTransition] = useTransition();
   const sourceCount = 1 + new Set(job.duplicates.map((d) => d.sourceKey)).size;
   const possiblyClosed = job.disappearedAt != null && job.dismissedAt == null;
+  const blocked = job.flags.some((f) => (HARD_FLAGS as readonly string[]).includes(f));
 
   return (
     <li
       className={clsx(
         "group relative flex gap-3 border-b border-border px-4 py-4 transition-colors last:border-0 hover:bg-surface-2/60 sm:gap-4 sm:px-5",
-        possiblyClosed && "opacity-70",
+        (possiblyClosed || blocked) && "opacity-70",
       )}
     >
       <CompanyLogo name={job.company} url={job.url} />
@@ -96,6 +99,7 @@ export function JobRow({ job, isNew }: { job: JobRowData; isNew: boolean }) {
           </div>
         </div>
         <div className="mt-2 flex flex-wrap items-center gap-1.5">
+          {job.fitScore != null && <FitScore score={job.fitScore} reasons={job.fitReasons} />}
           {isNew && <Badge variant="new">New</Badge>}
           {job.terms.map((t) => (
             <Badge key={t} variant="accent">
@@ -119,6 +123,7 @@ export function JobRow({ job, isNew }: { job: JobRowData; isNew: boolean }) {
             </span>
           )}
         </div>
+        <FitReasons reasons={job.fitReasons} blocked={blocked} />
         {possiblyClosed && (
           <div className="mt-2.5 flex flex-wrap items-center gap-3 rounded-xl bg-surface-2 px-3 py-2 text-sm text-muted">
             <span>Dropped off its source — possibly closed.</span>

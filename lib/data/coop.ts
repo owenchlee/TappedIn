@@ -2,7 +2,8 @@ import { prisma } from "@/lib/db";
 import type { CoopPosting, SavedItem } from "@/lib/generated/prisma/client";
 import { isPastDate } from "@/lib/deadline";
 
-export type CoopPostingView = CoopPosting & { saved: SavedItem | null };
+// `details` (the posting text) is omitted from every query by default; see lib/db.ts.
+export type CoopPostingView = Omit<CoopPosting, "details"> & { saved: SavedItem | null };
 
 export type CoopSort = "deadline" | "recent";
 

@@ -1,6 +1,9 @@
 import type { Metadata } from "next";
 import { headers } from "next/headers";
-import { CalendarDays, Download, FileSpreadsheet, LogOut, ShieldCheck } from "lucide-react";
+import { CalendarDays, Download, FileSpreadsheet, LogOut, ShieldCheck, Target } from "lucide-react";
+import { JobPrefsForm } from "@/components/JobPrefsForm";
+import { getJobPrefs } from "@/lib/fit/store";
+import { termForDate, termRange } from "@/lib/terms";
 import { prisma } from "@/lib/db";
 import { PageHeader, SectionTitle } from "@/components/ui/PageHeader";
 import { Card } from "@/components/ui/Card";
@@ -14,10 +17,11 @@ export const metadata: Metadata = { title: "Settings" };
 export const dynamic = "force-dynamic";
 
 export default async function SettingsPage() {
-  const [token, h, counts] = await Promise.all([
+  const [token, h, counts, prefs] = await Promise.all([
     calendarToken(),
     headers(),
     Promise.all([prisma.savedItem.count(), prisma.contact.count(), prisma.term.count(), prisma.applicationEvent.count()]),
+    getJobPrefs(),
   ]);
   const host = h.get("x-forwarded-host") ?? h.get("host") ?? "localhost:3000";
   const proto = h.get("x-forwarded-proto") ?? (host.startsWith("localhost") ? "http" : "https");
@@ -26,6 +30,22 @@ export default async function SettingsPage() {
   return (
     <div className="max-w-3xl space-y-8">
       <PageHeader title="Settings" />
+
+      <section id="job-prefs">
+        <SectionTitle>
+          <span className="flex items-center gap-1.5">
+            <Target className="size-4 text-muted-2" />
+            What you&apos;re looking for
+          </span>
+        </SectionTitle>
+        <Card className="space-y-4">
+          <p className="text-sm text-muted">
+            The Jobs page ranks every posting against this and hides the ones you can&apos;t apply to (another graduating class, upper years
+            only, grad students only, U.S. citizens only).
+          </p>
+          <JobPrefsForm prefs={prefs} terms={termRange(termForDate(new Date()), 6)} />
+        </Card>
+      </section>
 
       <section>
         <SectionTitle>Appearance</SectionTitle>
