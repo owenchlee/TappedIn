@@ -140,6 +140,16 @@ async function fetchTarget(target: DetailTarget, cache: DetailCache): Promise<De
       const d = await getJson<{ content?: string; title?: string }>(target.api);
       return { status: "ok", text: htmlToText(d.content ?? "") };
     }
+    case "greenhouse-guess": {
+      for (const api of target.apis) {
+        const d = await getJson<{ content?: string }>(api).catch(() => null);
+        if (d?.content) return { status: "ok", text: htmlToText(d.content) };
+      }
+      // No board guessed right. The page may still have the posting (or JSON-LD); it never counts as gone.
+      const res = await request(target.url, "text/html,application/xhtml+xml");
+      const page = extractFromHtml(await res.text(), res.url || target.url);
+      return page.status === "gone" ? { status: "unsupported", reason: "Couldn't find the Greenhouse board" } : page;
+    }
     case "lever": {
       const d = await getJson<{ descriptionPlain?: string; lists?: { text?: string; content?: string }[]; additionalPlain?: string }>(target.api);
       const lists = (d.lists ?? []).map((l) => `${l.text ?? ""}\n${htmlToText(l.content ?? "")}`).join("\n\n");

@@ -3,7 +3,8 @@ import type { FetchCtx, LoadedSource, RawPosting, SourceAdapter } from "@/lib/so
 type LeverPosting = {
   text: string;
   hostedUrl: string;
-  categories?: { location?: string };
+  // `allLocations` lists every office for multi-location postings (Waabi: Toronto + Pittsburgh + SF).
+  categories?: { location?: string; allLocations?: string[] };
   createdAt?: number;
 };
 
@@ -20,7 +21,7 @@ export const leverAdapter: SourceAdapter = {
     return (data ?? []).map((posting) => ({
       title: posting.text,
       url: posting.hostedUrl,
-      location: posting.categories?.location,
+      location: [...new Set([posting.categories?.location, ...(posting.categories?.allLocations ?? [])].filter((l): l is string => Boolean(l)))].join(" · ") || undefined,
       postedAt: posting.createdAt ? new Date(posting.createdAt) : undefined,
     }));
   },

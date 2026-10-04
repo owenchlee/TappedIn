@@ -15,8 +15,16 @@ describe("resolveDetailTarget", () => {
     });
   });
 
-  it("reads a company site with ?gh_jid= as a page, since the board name is unknown", () => {
-    expect(resolveDetailTarget("https://careers.withwaymo.com/jobs?gh_jid=8243732")?.kind).toBe("html");
+  it("guesses the Greenhouse board behind a company site with ?gh_jid=", () => {
+    expect(resolveDetailTarget("https://careers.withwaymo.com/jobs?gh_jid=8243732")).toEqual({
+      kind: "greenhouse-guess",
+      apis: ["withwaymo", "waymo"].map((b) => `https://boards-api.greenhouse.io/v1/boards/${b}/jobs/8243732`),
+      url: "https://careers.withwaymo.com/jobs?gh_jid=8243732",
+    });
+    const pin = resolveDetailTarget("https://www.pinterestcareers.com/jobs/7255640/phd-intern/?jr_id=1&gh_jid=7255640");
+    expect(pin && "apis" in pin && pin.apis).toContain("https://boards-api.greenhouse.io/v1/boards/pinterest/jobs/7255640");
+    const puck = resolveDetailTarget("https://app.careerpuck.com/job-board/domino-data-lab/job/7992534?gh_jid=7992534");
+    expect(puck && "apis" in puck && puck.apis[0]).toBe("https://boards-api.greenhouse.io/v1/boards/domino-data-lab/jobs/7992534");
   });
 
   it("maps Lever, Ashby, SmartRecruiters and Workable", () => {

@@ -3,6 +3,8 @@
 
 export type DetailTarget =
   | { kind: "greenhouse"; api: string }
+  /** A company site with ?gh_jid=: try likely board names, else read the page. */
+  | { kind: "greenhouse-guess"; apis: string[]; url: string }
   | { kind: "lever"; api: string }
   | { kind: "ashby"; org: string; id: string }
   | { kind: "smartrecruiters"; api: string }
@@ -81,6 +83,21 @@ export function resolveDetailTarget(rawUrl: string): DetailTarget | null {
     const jAt = parts.indexOf("j");
     if (jAt === 1 && parts[2]) return { kind: "workable", api: `https://apply.workable.com/api/v2/accounts/${encodeURIComponent(parts[0])}/jobs/${parts[2]}` };
     return null;
+  }
+
+  // A company's own careers site embedding Greenhouse (?gh_jid=). Job ids are unique across all of
+  // Greenhouse, so a board that returns this id is the right one; guess board names from the host
+  // ("careers.withwaymo.com" → withwaymo, waymo) and from careerpuck-style paths.
+  const ghJid = url.searchParams.get("gh_jid");
+  if (ghJid && /^\d+$/.test(ghJid)) {
+    const labels = host.replace(/^(www|careers|jobs|boards?|apply|app)\./, "").split(".");
+    const base = labels.length > 1 ? labels[labels.length - 2] : labels[0];
+    const pathBoard = parts[0] === "job-board" ? parts[1] : null;
+    const names = [pathBoard, base, base.replace(/^(with|get|join|go|fly|team)/, ""), base.replace(/(careers|jobs|hq|inc|app|hiring)$/, "")].filter(
+      (n): n is string => Boolean(n) && n!.length >= 2,
+    );
+    const apis = [...new Set(names)].map((n) => `https://boards-api.greenhouse.io/v1/boards/${encodeURIComponent(n)}/jobs/${ghJid}`);
+    return { kind: "greenhouse-guess", apis, url: rawUrl };
   }
 
   // Oracle Cloud HCM: <host>.oraclecloud.com/hcmUI/CandidateExperience/<lang>/sites/<site>/job/<id>.

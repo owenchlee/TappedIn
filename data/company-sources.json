@@ -131,6 +131,123 @@
         "includeTitle": "\\b(intern|internship|co-?op|university|new grad)\\b",
         "includeLocation": "(canada|remote|toronto|ottawa|waterloo|new york|washington)"
       }
+    },
+    {
+      "key": "lyft",
+      "name": "Lyft",
+      "careerUrl": "https://www.lyft.com/careers",
+      "adapter": "greenhouse",
+      "enabled": true,
+      "config": { "boardToken": "lyft" },
+      "match": { "includeTitle": "\\b(intern|internship|co-?op|student)\\b", "regions": ["canada", "remote"] }
+    },
+    {
+      "key": "pinterest",
+      "name": "Pinterest",
+      "careerUrl": "https://www.pinterestcareers.com/",
+      "adapter": "greenhouse",
+      "enabled": true,
+      "config": { "boardToken": "pinterest" },
+      "match": { "includeTitle": "\\b(intern|internship|co-?op|student)\\b", "regions": ["canada", "remote"] }
+    },
+    {
+      "key": "stripe",
+      "name": "Stripe",
+      "careerUrl": "https://stripe.com/jobs",
+      "adapter": "greenhouse",
+      "enabled": true,
+      "config": { "boardToken": "stripe" },
+      "match": { "includeTitle": "\\b(intern|internship|co-?op|student)\\b", "regions": ["canada", "remote"] }
+    },
+    {
+      "key": "faire",
+      "name": "Faire",
+      "careerUrl": "https://www.faire.com/careers",
+      "adapter": "greenhouse",
+      "enabled": true,
+      "config": { "boardToken": "faire" },
+      "match": { "includeTitle": "\\b(intern|internship|co-?op|student)\\b", "regions": ["canada", "remote"] }
+    },
+    {
+      "key": "instacart",
+      "name": "Instacart",
+      "careerUrl": "https://instacart.careers/",
+      "adapter": "greenhouse",
+      "enabled": true,
+      "config": { "boardToken": "instacart" },
+      "match": { "includeTitle": "\\b(intern|internship|co-?op|student)\\b", "regions": ["canada", "remote"] }
+    },
+    {
+      "key": "tenstorrent",
+      "name": "Tenstorrent",
+      "careerUrl": "https://tenstorrent.com/careers",
+      "adapter": "greenhouse",
+      "enabled": true,
+      "config": { "boardToken": "tenstorrent" },
+      "match": { "includeTitle": "\\b(intern|internship|co-?op|student)\\b", "regions": ["canada", "remote"] }
+    },
+    {
+      "key": "d2l",
+      "name": "D2L",
+      "careerUrl": "https://www.d2l.com/careers/",
+      "adapter": "greenhouse",
+      "enabled": true,
+      "config": { "boardToken": "d2l" },
+      "match": { "includeTitle": "\\b(intern|internship|co-?op|student)\\b", "regions": ["canada", "remote"] }
+    },
+    {
+      "key": "1password",
+      "name": "1Password",
+      "careerUrl": "https://jobs.ashbyhq.com/1password",
+      "adapter": "ashby",
+      "enabled": true,
+      "config": { "org": "1password" },
+      "match": { "includeTitle": "\\b(intern|internship|co-?op|student)\\b", "regions": ["canada", "remote"] }
+    },
+    {
+      "key": "jobber",
+      "name": "Jobber",
+      "careerUrl": "https://jobs.ashbyhq.com/jobber",
+      "adapter": "ashby",
+      "enabled": true,
+      "config": { "org": "jobber" },
+      "match": { "includeTitle": "\\b(intern|internship|co-?op|student)\\b", "regions": ["canada", "remote"] }
+    },
+    {
+      "key": "neo-financial",
+      "name": "Neo Financial",
+      "careerUrl": "https://jobs.ashbyhq.com/neofinancial",
+      "adapter": "ashby",
+      "enabled": true,
+      "config": { "org": "neofinancial" },
+      "match": { "includeTitle": "\\b(intern|internship|co-?op|student)\\b", "regions": ["canada", "remote"] }
+    },
+    {
+      "key": "waabi",
+      "name": "Waabi",
+      "careerUrl": "https://jobs.lever.co/waabi",
+      "adapter": "lever",
+      "enabled": true,
+      "config": { "company": "waabi" },
+      "match": { "includeTitle": "\\b(intern|internship|co-?op|student)\\b", "regions": ["canada", "remote"] }
+    },
+    {
+      "key": "kepler",
+      "name": "Kepler Communications",
+      "careerUrl": "https://jobs.lever.co/kepler",
+      "adapter": "lever",
+      "enabled": true,
+      "config": { "company": "kepler" },
+      "match": { "includeTitle": "\\b(intern|internship|co-?op|student)\\b", "regions": ["canada", "remote"] }
+    },
+    {
+      "key": "magnet-forensics",
+      "name": "Magnet Forensics",
+      "careerUrl": "https://jobs.lever.co/magnetforensics",
+      "adapter": "lever",
+      "enabled": true,
+      "config": { "company": "magnetforensics" },
+      "match": { "includeTitle": "\\b(intern|internship|co-?op|student)\\b", "regions": ["canada", "remote"] }
     }
   ]
 }
