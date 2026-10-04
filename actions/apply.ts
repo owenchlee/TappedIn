@@ -26,7 +26,7 @@ function spawnRunner(jobId: string, fillOnly = false) {
   spawnHidden(process.execPath, args, { cwd: root, logFile: path.join(jobDir(jobId), "runner.log") });
 }
 
-async function start(input: Pick<Job, "source" | "company" | "role" | "url">): Promise<string> {
+async function start(input: Pick<Job, "source" | "company" | "role" | "url" | "region">): Promise<string> {
   assertEnabled();
   let url: URL;
   try {
@@ -42,8 +42,8 @@ async function start(input: Pick<Job, "source" | "company" | "role" | "url">): P
 }
 
 export async function startAutoApplyPosting(postingId: string): Promise<string> {
-  const p = await prisma.coopPosting.findUniqueOrThrow({ where: { id: postingId }, select: { id: true, company: true, role: true, url: true } });
-  return start({ source: { kind: "coop", id: p.id }, company: p.company, role: p.role, url: p.url });
+  const p = await prisma.coopPosting.findUniqueOrThrow({ where: { id: postingId }, select: { id: true, company: true, role: true, url: true, region: true } });
+  return start({ source: { kind: "coop", id: p.id }, company: p.company, role: p.role, url: p.url, region: p.region });
 }
 
 export async function startAutoApplyOrg(orgId: string): Promise<string> {

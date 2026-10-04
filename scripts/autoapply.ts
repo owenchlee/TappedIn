@@ -379,7 +379,7 @@ async function main() {
     await page.goto(job.url, { timeout: 45_000 });
     await settle(page);
     if (!has("jd.txt") || !fillOnly) writeFileSync(path.join(dir, "jd.txt"), await pageText(page));
-    job.warnings = eligibilityWarnings(read("jd.txt"));
+    job.warnings = eligibilityWarnings(read("jd.txt"), job.region);
     if (job.warnings.length) log(`Heads up: ${job.warnings.join("; ")}`);
     const found = await findForm(page);
     page = found.page;

@@ -25,6 +25,8 @@ export type Job = {
   company: string;
   role: string;
   url: string;
+  /** The posting's region (canada | remote | us | intl) when it came from the Jobs list. */
+  region?: string | null;
   status: JobStatus;
   steps: Record<StepName, { state: StepState; detail?: string }>;
   resumeBase?: ResumeBase;
@@ -72,7 +74,7 @@ export function newJobId(company: string, role: string, now = new Date()): strin
   return `${stamp}-${slug(`${company}-${role}`) || "job"}`;
 }
 
-export function createJob(input: Pick<Job, "source" | "company" | "role" | "url">): Job {
+export function createJob(input: Pick<Job, "source" | "company" | "role" | "url" | "region">): Job {
   const now = new Date();
   const job: Job = {
     id: newJobId(input.company, input.role, now),

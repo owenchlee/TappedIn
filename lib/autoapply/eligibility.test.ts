@@ -24,6 +24,14 @@ describe("eligibilityWarnings", () => {
     expect(eligibilityWarnings("Candidates must be authorized to work without sponsorship.").join()).toMatch(/sponsorship/);
   });
 
+  it("says nothing about U.S. rules on a job in Canada", () => {
+    // Ovintiv, Calgary: a Canadian needs no sponsorship to work in Canada.
+    const ovintiv = "Must be legally eligible to work in Canada for the duration of your work term without sponsorship.";
+    expect(eligibilityWarnings(ovintiv, "canada")).toEqual([]);
+    expect(eligibilityWarnings(ovintiv)).toEqual([]); // pasted link: guessed from the text
+    expect(eligibilityWarnings("We are unable to sponsor visas for this role.", "us").join()).toMatch(/sponsorship/);
+  });
+
   it("stays quiet on normal postings", () => {
     expect(
       eligibilityWarnings(
