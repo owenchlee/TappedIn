@@ -83,6 +83,12 @@ backlog at once (and `-- --rescore` only re-scores, after changing the rules).
 
 ## Running locally
 
+Day to day, `npm run app` (or `/run` in Claude Code) is all you need: it starts the database (clearing
+a stale lock if a crash left one), applies migrations, starts the dev server in the background and
+opens the app in Chrome. It only starts what isn't already running.
+
+First-time setup:
+
 ```bash
 npm install
 cp .env.example .env        # then edit APP_PASSWORD / AUTH_SECRET
