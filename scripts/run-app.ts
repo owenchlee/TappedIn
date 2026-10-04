@@ -84,7 +84,10 @@ async function startApp() {
   mkdirSync(LOG_DIR, { recursive: true });
   const log = openSync(path.join(LOG_DIR, "dev.log"), "a");
   // Detached so it keeps running after this script exits (and after Claude Code's command ends).
-  spawn("npm run dev", { shell: true, detached: true, stdio: ["ignore", log, log], windowsHide: true }).unref();
+  // Node runs Next directly: through npm/cmd.exe, Windows passes the terminal's Ctrl+C to the batch
+  // file when this script's shell closes, and the server dies with it.
+  const nextBin = path.join(process.cwd(), "node_modules", "next", "dist", "bin", "next");
+  spawn(process.execPath, [nextBin, "dev"], { detached: true, stdio: ["ignore", log, log], windowsHide: true }).unref();
   if (!(await waitFor(() => portOpen(3000), 60))) throw new Error(`The app didn't start. See ${path.join(LOG_DIR, "dev.log")}`);
   // The first request compiles the home page; wait for it so Chrome doesn't open on a spinner.
   if (!(await waitFor(appResponds, 90))) throw new Error(`The app isn't responding. See ${path.join(LOG_DIR, "dev.log")}`);
