@@ -4,9 +4,10 @@ const nextConfig: NextConfig = {
   turbopack: {
     root: __dirname,
   },
-  // Open the app at 127.0.0.1, because localhost:3000 has another project's service worker. Without
-  // this, Next 16 blocks dev scripts from that origin and pages load without any client JS.
+  // Lets the app also be opened at 127.0.0.1; without it, Next 16 blocks dev scripts from that origin.
   allowedDevOrigins: ["127.0.0.1"],
+  // No floating "N" badge in the corner while developing.
+  devIndicators: false,
   async redirects() {
     return [
       { source: "/coop", destination: "/jobs", permanent: false },

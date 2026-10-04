@@ -5,11 +5,12 @@
  * Safe to run when everything is already running: it only starts what's missing.
  */
 import "dotenv/config";
-import { execSync, spawn, spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, openSync, rmSync } from "node:fs";
+import { execSync, spawnSync } from "node:child_process";
+import { existsSync, mkdirSync, readFileSync, rmSync } from "node:fs";
 import net from "node:net";
 import os from "node:os";
 import path from "node:path";
+import { spawnHidden } from "../lib/spawnHidden";
 
 const APP_URL = "http://localhost:3000";
 const DB_NAME = "tappedin";
@@ -82,22 +83,33 @@ async function startApp() {
 
   console.log("… Starting the app");
   mkdirSync(LOG_DIR, { recursive: true });
-  const log = openSync(path.join(LOG_DIR, "dev.log"), "a");
-  // Detached so it keeps running after this script exits (and after Claude Code's command ends).
-  // Node runs Next directly: through npm/cmd.exe, Windows passes the terminal's Ctrl+C to the batch
-  // file when this script's shell closes, and the server dies with it.
+  // In its own hidden console, so it keeps running after this script (and Claude Code's command)
+  // ends, and its worker processes don't open terminal windows.
   const nextBin = path.join(process.cwd(), "node_modules", "next", "dist", "bin", "next");
-  spawn(process.execPath, [nextBin, "dev"], { detached: true, stdio: ["ignore", log, log], windowsHide: true }).unref();
+  spawnHidden(process.execPath, [nextBin, "dev"], { cwd: process.cwd(), logFile: path.join(LOG_DIR, "dev.log") });
   if (!(await waitFor(() => portOpen(3000), 60))) throw new Error(`The app didn't start. See ${path.join(LOG_DIR, "dev.log")}`);
   // The first request compiles the home page; wait for it so Chrome doesn't open on a spinner.
   if (!(await waitFor(appResponds, 90))) throw new Error(`The app isn't responding. See ${path.join(LOG_DIR, "dev.log")}`);
   console.log(`✓ App started (log: ${path.join(LOG_DIR, "dev.log")})`);
 }
 
+/** The Chrome profile you used last, so the app opens as a tab there instead of in another profile's window. */
+function lastChromeProfile(): string | null {
+  try {
+    const state = JSON.parse(readFileSync(path.join(process.env.LOCALAPPDATA ?? "", "Google", "Chrome", "User Data", "Local State"), "utf8"));
+    return state.profile?.last_used ?? null;
+  } catch {
+    return null;
+  }
+}
+
 function openChrome() {
   if (process.argv.includes("--no-open")) return;
   try {
-    if (process.platform === "win32") execSync(`start "" chrome "${APP_URL}"`, { stdio: "ignore", shell: "cmd.exe" });
+    if (process.platform === "win32") {
+      const profile = lastChromeProfile();
+      execSync(`start "" chrome ${profile ? `--profile-directory="${profile}" ` : ""}"${APP_URL}"`, { stdio: "ignore", shell: "cmd.exe" });
+    }
     else if (process.platform === "darwin") execSync(`open -a "Google Chrome" "${APP_URL}"`, { stdio: "ignore" });
     else execSync(`xdg-open "${APP_URL}"`, { stdio: "ignore" });
   } catch {

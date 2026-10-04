@@ -1,8 +1,7 @@
 "use server";
 
-import { spawn } from "node:child_process";
-import { openSync } from "node:fs";
 import path from "node:path";
+import { spawnHidden } from "@/lib/spawnHidden";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { createJob, jobDir, readJob, writeCommand, writeJob, type Job, type JobCommand } from "@/lib/autoapply/job";
@@ -22,11 +21,9 @@ function assertEnabled() {
 /** Starts the detached runner. It outlives dev-server reloads and exits when its Chrome window closes. */
 function spawnRunner(jobId: string, fillOnly = false) {
   const root = process.cwd();
-  const log = openSync(path.join(jobDir(jobId), "runner.log"), "a");
   const tsxCli = path.join(root, "node_modules", "tsx", "dist", "cli.mjs");
   const args = [tsxCli, path.join(root, "scripts", "autoapply.ts"), jobId, ...(fillOnly ? ["--fill-only"] : [])];
-  const child = spawn(process.execPath, args, { cwd: root, detached: true, stdio: ["ignore", log, log], windowsHide: true });
-  child.unref();
+  spawnHidden(process.execPath, args, { cwd: root, logFile: path.join(jobDir(jobId), "runner.log") });
 }
 
 async function start(input: Pick<Job, "source" | "company" | "role" | "url">): Promise<string> {
