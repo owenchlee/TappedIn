@@ -2,6 +2,7 @@ import type { FetchCtx, LoadedSource, RawPosting, SourceAdapter } from "@/lib/so
 
 type WorkdayJob = { title: string; externalPath: string; locationsText?: string; postedOn?: string };
 type WorkdayResponse = { total?: number; jobPostings?: WorkdayJob[] };
+type WorkdayDetail = { jobPostingInfo?: { location?: string; additionalLocations?: string[] } };
 
 const PAGE_SIZE = 20; // Workday rejects larger pages.
 
@@ -31,7 +32,10 @@ export const workdayAdapter: SourceAdapter = {
     }
     const endpoint = `https://${host}/wday/cxs/${encodeURIComponent(tenant)}/${encodeURIComponent(site)}/jobs`;
 
-    const postings: RawPosting[] = [];
+    const postings: (RawPosting & { externalPath: string })[] = [];
+    // Workday only reports the real total on the first page; later pages say total: 0. Trusting
+    // that stopped every Workday source after 40 jobs (TD has 1,300+).
+    let total: number | null = null;
     for (let page = 0; page < MAX_PAGES; page++) {
       const data = await ctx.postJson<WorkdayResponse>(endpoint, {
         appliedFacets: {},
@@ -39,6 +43,7 @@ export const workdayAdapter: SourceAdapter = {
         offset: page * PAGE_SIZE,
         searchText,
       });
+      if (page === 0 && data.total) total = data.total;
       const jobs = data.jobPostings ?? [];
       for (const job of jobs) {
         postings.push({
@@ -46,10 +51,23 @@ export const workdayAdapter: SourceAdapter = {
           url: `https://${host}/${site}${job.externalPath}`,
           location: job.locationsText,
           postedAt: parsePostedOn(job.postedOn),
+          externalPath: job.externalPath,
         });
       }
-      if (jobs.length < PAGE_SIZE || (data.total != null && postings.length >= data.total)) break;
+      if (jobs.length < PAGE_SIZE || (total != null && postings.length >= total)) break;
     }
-    return postings;
+
+    // Multi-location jobs only say "2 Locations" in search results, so the region filter can't
+    // place them (all of TD's Toronto/Montreal co-ops were dropped). Look those up, but only for
+    // titles the source keeps anyway, to stay polite.
+    const wanted = source.match?.includeTitle ? new RegExp(source.match.includeTitle, "i") : null;
+    for (const p of postings) {
+      if (!/^\d+ Locations?$/i.test(p.location ?? "") || (wanted && !wanted.test(p.title))) continue;
+      const detail = await ctx.fetchJson<WorkdayDetail>(`https://${host}/wday/cxs/${encodeURIComponent(tenant)}/${encodeURIComponent(site)}${p.externalPath}`).catch(() => null);
+      const info = detail?.jobPostingInfo;
+      const all = [info?.location, ...(info?.additionalLocations ?? [])].filter((l): l is string => Boolean(l));
+      if (all.length) p.location = all.join(" · ");
+    }
+    return postings.map((p) => ({ title: p.title, url: p.url, location: p.location, postedAt: p.postedAt }));
   },
 };
