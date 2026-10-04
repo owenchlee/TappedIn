@@ -17,7 +17,7 @@ export function ApplicationTable({ apps }: { apps: ApplicationView[] }) {
   const [, startTransition] = useTransition();
 
   return (
-    <div className="overflow-x-auto rounded-xl border border-border bg-surface shadow-card">
+    <div className="overflow-x-auto rounded-2xl border border-border bg-surface shadow-card">
       <table className="w-full min-w-[760px] text-sm">
         <thead>
           <tr className="border-b border-border text-left text-xs text-muted-2">

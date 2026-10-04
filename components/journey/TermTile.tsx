@@ -46,7 +46,7 @@ export function TermTile({ code, term, isCurrent, isPast }: { code: string; term
         type="button"
         onClick={() => setOpen(true)}
         className={clsx(
-          "group flex min-h-32 flex-col rounded-xl border p-3.5 text-left shadow-card transition-all hover:border-border-strong hover:shadow-pop",
+          "group flex min-h-32 flex-col rounded-2xl border p-4 text-left shadow-card transition-all hover:border-border-strong hover:shadow-pop",
           term ? "border-border bg-surface" : "border-dashed border-border-strong bg-surface/40",
           isCurrent && "ring-2 ring-accent/60",
           isPast && !term && "opacity-60",

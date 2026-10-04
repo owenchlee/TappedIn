@@ -54,7 +54,7 @@ export default async function InsightsPage() {
 
   return (
     <div className="space-y-8">
-      <PageHeader title="Insights" description="How your search is going — based on the co-op applications you've logged." />
+      <PageHeader title="Insights" description="How your search is going, based on the co-op applications you've logged." />
 
       <section>
         <SectionTitle>Funnel</SectionTitle>

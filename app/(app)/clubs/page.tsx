@@ -13,12 +13,7 @@ export default async function ClubsPage({ searchParams }: PageProps<"/clubs">) {
   return (
     <OrgListPage
       title="Clubs"
-      description={
-        <>
-          Clubs worth joining, from <code className="rounded bg-surface-2 px-1 py-0.5 text-xs">data/clubs.json</code>. Bookmark one to track your
-          application alongside everything else.
-        </>
-      }
+      description="Clubs worth joining. Save one to track it with your other applications."
       orgs={orgs}
       hiddenCount={hiddenCount}
       showPast={showPast}

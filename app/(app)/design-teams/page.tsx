@@ -13,12 +13,7 @@ export default async function DesignTeamsPage({ searchParams }: PageProps<"/desi
   return (
     <OrgListPage
       title="Design teams"
-      description={
-        <>
-          UW student design teams, from <code className="rounded bg-surface-2 px-1 py-0.5 text-xs">data/design-teams.json</code>. Set the status and
-          deadline when recruiting opens — &ldquo;Check now&rdquo; opens the team&apos;s site and stamps when you last looked.
-        </>
-      }
+      description="UW student design teams. Save one to track it, and check back when recruiting opens."
       orgs={orgs}
       hiddenCount={hiddenCount}
       showPast={showPast}

@@ -4,13 +4,14 @@ import { KanbanSquare, List } from "lucide-react";
 import { listApplications, listTermsInUse } from "@/lib/data/applications";
 import { ApplicationBoard } from "@/components/applications/ApplicationBoard";
 import { ApplicationTable } from "@/components/applications/ApplicationTable";
-import { LogApplicationButton } from "@/components/applications/LogApplicationButton";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { LinkTabs, withParams } from "@/components/ui/LinkTabs";
+import { FilterSelect } from "@/components/ui/FilterSelect";
 import { SearchBox } from "@/components/SearchBox";
+import { buttonClasses } from "@/components/ui/Button";
 import { SAVED_CATEGORIES, type SavedCategory } from "@/lib/types";
-import { nextTerm, termForDate, termLabel, termSortKey } from "@/lib/terms";
+import { termLabel, termSortKey } from "@/lib/terms";
 
 export const metadata: Metadata = { title: "Applications" };
 export const dynamic = "force-dynamic";
@@ -38,18 +39,15 @@ export default async function ApplicationsPage({ searchParams }: PageProps<"/app
     listTermsInUse(),
   ]);
   const terms = [...termsInUse].sort((a, b) => termSortKey(b) - termSortKey(a));
-  // Co-op recruiting for a term happens the term before it.
-  const defaultTerm = nextTerm(termForDate(new Date()));
 
   return (
     <div>
       <PageHeader
         title="Applications"
-        description="Every application in one pipeline — drag cards between stages, or change the stage from the pill."
-        actions={<LogApplicationButton defaultTerm={defaultTerm} />}
+        description="Drag a card to the next column when something changes."
       />
 
-      <div className="mb-5 flex flex-wrap items-center gap-2">
+      <div className="mb-6 flex flex-wrap items-center gap-2">
         <LinkTabs
           items={(["all", ...SAVED_CATEGORIES] as const).map((c) => ({
             href: withParams("/applications", current, { category: c === "all" ? undefined : c }),
@@ -59,19 +57,38 @@ export default async function ApplicationsPage({ searchParams }: PageProps<"/app
           }))}
         />
         {terms.length > 0 && (
-          <LinkTabs
-            items={[
+          <FilterSelect
+            label="Term"
+            options={[
               { href: withParams("/applications", current, { term: undefined }), label: "Any term", active: term === "all" },
               ...terms.map((t) => ({ href: withParams("/applications", current, { term: t }), label: termLabel(t), active: term === t })),
             ]}
           />
         )}
-        <div className="ml-auto flex items-center gap-2">
-          <SearchBox placeholder="Filter…" />
+        <div className="flex w-full items-center gap-2 lg:ml-auto lg:w-auto">
+          <SearchBox placeholder="Search applications" className="flex-1 sm:w-64 sm:flex-none" />
           <LinkTabs
             items={[
-              { href: withParams("/applications", current, { view: undefined }), label: <KanbanSquare className="size-3.5" />, active: view === "board" },
-              { href: withParams("/applications", current, { view: "list" }), label: <List className="size-3.5" />, active: view === "list" },
+              {
+                href: withParams("/applications", current, { view: undefined }),
+                label: (
+                  <>
+                    <KanbanSquare className="size-3.5" />
+                    Board
+                  </>
+                ),
+                active: view === "board",
+              },
+              {
+                href: withParams("/applications", current, { view: "list" }),
+                label: (
+                  <>
+                    <List className="size-3.5" />
+                    List
+                  </>
+                ),
+                active: view === "list",
+              },
             ]}
           />
         </div>
@@ -81,10 +98,10 @@ export default async function ApplicationsPage({ searchParams }: PageProps<"/app
         <EmptyState
           icon={KanbanSquare}
           title="No applications yet"
-          description="Bookmark a job, design team, club or hackathon to start tracking it — or log a WaterlooWorks application directly."
+          description="Save a job to start tracking it, or press Add at the top to log one from WaterlooWorks."
           action={
-            <Link href="/jobs" className="text-sm font-medium text-accent hover:underline">
-              Browse jobs →
+            <Link href="/jobs" className={buttonClasses("primary", "md")}>
+              Browse jobs
             </Link>
           }
         />

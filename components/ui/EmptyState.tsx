@@ -12,13 +12,13 @@ export function EmptyState({
   icon?: LucideIcon;
 }) {
   return (
-    <div className="flex flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-border-strong bg-surface/40 px-6 py-14 text-center">
+    <div className="flex flex-col items-center justify-center gap-2 rounded-2xl border border-dashed border-border-strong bg-surface/60 px-6 py-16 text-center">
       {Icon && (
-        <div className="mb-1 flex size-10 items-center justify-center rounded-xl bg-accent-soft text-accent">
+        <div className="mb-2 flex size-12 items-center justify-center rounded-full bg-accent-soft text-accent">
           <Icon className="size-5" />
         </div>
       )}
-      <p className="text-sm font-semibold text-text">{title}</p>
+      <p className="text-base font-semibold text-text">{title}</p>
       {description && <p className="max-w-sm text-sm text-muted">{description}</p>}
       {action && <div className="mt-2">{action}</div>}
     </div>

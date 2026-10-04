@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/Button";
 export function LoginForm({ next }: { next: string }) {
   const [state, action, pending] = useActionState<LoginState, FormData>(login, { error: null });
   return (
-    <form action={action} className="space-y-3 rounded-2xl border border-border bg-surface p-5 shadow-pop">
+    <form action={action} className="space-y-4 rounded-3xl border border-border bg-surface p-6 shadow-pop">
       <input type="hidden" name="next" value={next} />
       <label className="block">
         <span className="mb-1.5 block text-xs font-medium text-muted">Password</span>

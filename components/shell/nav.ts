@@ -16,47 +16,54 @@ import {
   type LucideIcon,
 } from "lucide-react";
 
-export type NavItem = { href: string; label: string; icon: LucideIcon; badgeKey?: "newJobs" | "dueSoon" | "actionable" };
-export type NavSection = { label: string | null; items: NavItem[] };
+export type NavItem = {
+  href: string;
+  label: string;
+  icon: LucideIcon;
+  badgeKey?: "newJobs" | "dueSoon" | "actionable";
+  /** One line shown under the label in the More menu. */
+  hint?: string;
+};
+export type NavSection = { label: string; items: NavItem[] };
 
-export function navSections(opts: { autoApply: boolean }): NavSection[] {
+/** The few places you go every day — always visible. */
+export const PRIMARY_NAV: NavItem[] = [
+  { href: "/", label: "Home", icon: House, badgeKey: "actionable" },
+  { href: "/jobs", label: "Jobs", icon: Briefcase, badgeKey: "newJobs" },
+  { href: "/applications", label: "Applications", icon: KanbanSquare, badgeKey: "dueSoon" },
+  { href: "/calendar", label: "Calendar", icon: CalendarDays },
+];
+
+/** Everything else, tucked under "More". */
+export function moreSections(opts: { autoApply: boolean }): NavSection[] {
   return [
     {
-      label: null,
+      label: "Explore",
       items: [
-        { href: "/", label: "Today", icon: House, badgeKey: "actionable" },
-        { href: "/calendar", label: "Calendar", icon: CalendarDays },
+        { href: "/hackathons", label: "Hackathons", icon: Trophy, hint: "Upcoming events nearby" },
+        { href: "/design-teams", label: "Design teams", icon: Cpu, hint: "Student teams recruiting" },
+        { href: "/clubs", label: "Clubs", icon: UsersRound, hint: "Clubs worth joining" },
       ],
     },
     {
-      label: "Discover",
+      label: "You",
       items: [
-        { href: "/jobs", label: "Jobs", icon: Briefcase, badgeKey: "newJobs" },
-        { href: "/hackathons", label: "Hackathons", icon: Trophy },
-        { href: "/design-teams", label: "Design teams", icon: Cpu },
-        { href: "/clubs", label: "Clubs", icon: UsersRound },
-      ],
-    },
-    {
-      label: "Track",
-      items: [
-        { href: "/applications", label: "Applications", icon: KanbanSquare, badgeKey: "dueSoon" },
-        { href: "/contacts", label: "Contacts", icon: Contact },
-        { href: "/journey", label: "Journey", icon: Route },
-        { href: "/insights", label: "Insights", icon: BarChart3 },
+        { href: "/contacts", label: "Contacts", icon: Contact, hint: "Recruiters and referrers" },
+        { href: "/journey", label: "Journey", icon: Route, hint: "Your five years, term by term" },
+        { href: "/insights", label: "Insights", icon: BarChart3, hint: "How your search is going" },
         ...(opts.autoApply
           ? [
-              { href: "/apply", label: "Auto-apply", icon: Wand2 },
-              { href: "/profile", label: "Profile", icon: UserRound },
+              { href: "/apply", label: "Auto-apply", icon: Wand2, hint: "Fill applications for you" },
+              { href: "/profile", label: "Profile", icon: UserRound, hint: "Answers used to auto-fill" },
             ]
           : []),
       ],
     },
     {
-      label: "System",
+      label: "Setup",
       items: [
-        { href: "/sources", label: "Sources", icon: Radar },
-        { href: "/settings", label: "Settings", icon: Settings },
+        { href: "/sources", label: "Sources", icon: Radar, hint: "Where jobs come from" },
+        { href: "/settings", label: "Settings", icon: Settings, hint: "Backup, calendar link, sign out" },
       ],
     },
   ];

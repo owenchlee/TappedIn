@@ -202,7 +202,7 @@ export function ProfileForm({ profile: initial }: { profile: Profile }) {
         </Card>
       </section>
 
-      <div className="sticky bottom-4 flex items-center justify-end gap-3 rounded-xl border border-border bg-surface/90 px-4 py-3 shadow-card backdrop-blur">
+      <div className="sticky bottom-20 lg:bottom-4 flex items-center justify-end gap-3 rounded-2xl border border-border bg-surface/90 px-4 py-3 shadow-card backdrop-blur">
         {state === "error" && <p className="mr-auto text-sm text-overdue">{error}</p>}
         {state === "saved" && (
           <p className="mr-auto flex items-center gap-1.5 text-sm text-emerald">

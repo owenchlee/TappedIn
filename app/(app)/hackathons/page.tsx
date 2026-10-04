@@ -26,12 +26,7 @@ export default async function HackathonsPage({ searchParams }: PageProps<"/hacka
   return (
     <OrgListPage
       title="Hackathons"
-      description={
-        <>
-          Your hand-picked list (<code className="rounded bg-surface-2 px-1 py-0.5 text-xs">data/hackathons.json</code>) plus every MLH event within
-          reach, refreshed daily. Driving distance means roughly 2 hours from Waterloo.
-        </>
-      }
+      description="Hackathons coming up near Waterloo and online, refreshed daily."
       filters={
         <LinkTabs
           items={PRESETS.map((p) => ({ href: withParams("/hackathons", current, { region: p.value }), label: p.label, active: p === preset }))}

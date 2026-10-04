@@ -33,10 +33,10 @@ export function ApplyButton({ kind, id }: { kind: "coop" | "org"; id: string }) 
           }
         })
       }
-      className="relative z-10 flex h-8 items-center gap-1.5 rounded-lg px-2.5 text-xs font-medium text-accent ring-1 ring-accent/40 ring-inset hover:bg-accent/10 disabled:opacity-60 data-[error]:text-overdue data-[error]:ring-overdue/40"
+      className="relative z-10 flex h-9 items-center gap-1.5 rounded-full px-3 text-sm font-medium text-accent ring-1 ring-accent/40 ring-inset transition-colors hover:bg-accent/10 disabled:opacity-60 data-[error]:text-overdue data-[error]:ring-overdue/40"
       data-error={error ? "" : undefined}
     >
-      {isPending ? <Loader2 className="size-3.5 animate-spin" /> : <Wand2 className="size-3.5" />}
+      {isPending ? <Loader2 className="size-4 animate-spin" /> : <Wand2 className="size-4" />}
       {error ? "Failed" : "Auto-apply"}
     </button>
   );

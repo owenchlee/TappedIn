@@ -31,7 +31,7 @@ export function Badge({
     <span
       title={title}
       className={clsx(
-        "inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] leading-4 font-medium whitespace-nowrap ring-1 ring-inset",
+        "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] leading-4 font-medium whitespace-nowrap ring-1 ring-inset",
         BADGE_CLASSES[variant],
         className,
       )}

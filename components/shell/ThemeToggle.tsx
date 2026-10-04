@@ -36,7 +36,7 @@ export function ThemeToggle() {
   const theme = useSyncExternalStore(subscribe, readTheme, () => "system" as Theme);
 
   return (
-    <div role="radiogroup" aria-label="Theme" className="grid grid-cols-3 gap-0.5 rounded-lg border border-border bg-surface-2 p-0.5">
+    <div role="radiogroup" aria-label="Theme" className="grid grid-cols-3 gap-0.5 rounded-full border border-border bg-surface-2 p-[3px]">
       {OPTIONS.map(({ value, icon: Icon, label }) => (
         <button
           key={value}
@@ -47,7 +47,7 @@ export function ThemeToggle() {
           title={label}
           onClick={() => applyTheme(value)}
           className={clsx(
-            "flex h-7 items-center justify-center rounded-md transition-colors",
+            "flex h-8 items-center justify-center rounded-full transition-colors",
             theme === value ? "bg-surface text-text shadow-card" : "text-muted-2 hover:text-muted",
           )}
         >

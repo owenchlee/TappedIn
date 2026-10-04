@@ -33,20 +33,20 @@ export function SearchBox({ placeholder = "Search…", param = "q", className }:
   }, [value, initial, param, pathname, router, searchParams]);
 
   return (
-    <div className={clsx("relative", className)}>
-      <Search className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-2" />
+    <div className={clsx("relative w-full sm:w-64", className)}>
+      <Search className="pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-muted-2" />
       <input
         value={value}
         onChange={(e) => setValue(e.target.value)}
         placeholder={placeholder}
-        className={clsx(FIELD_CLASSES, "h-9 w-full pr-8 pl-8 sm:w-56")}
+        className={clsx(FIELD_CLASSES, "h-10 w-full rounded-full pr-9 pl-10")}
       />
       {value && (
         <button
           type="button"
           aria-label="Clear"
           onClick={() => setValue("")}
-          className="absolute top-1/2 right-2 -translate-y-1/2 text-muted-2 hover:text-text"
+          className="absolute top-1/2 right-2 flex size-7 -translate-y-1/2 items-center justify-center rounded-full text-muted-2 hover:bg-surface-2 hover:text-text"
         >
           <X className="size-3.5" />
         </button>

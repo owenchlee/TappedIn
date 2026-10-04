@@ -25,8 +25,8 @@ export function Card({
   return (
     <div
       className={clsx(
-        "relative rounded-xl border border-border bg-surface shadow-card",
-        padded && "p-4",
+        "relative rounded-2xl border border-border bg-surface shadow-card",
+        padded && "p-5",
         accent && "overflow-hidden before:absolute before:inset-y-0 before:left-0 before:w-[3px]",
         accent,
         className,

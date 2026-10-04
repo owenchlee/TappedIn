@@ -10,14 +10,14 @@ export function LinkTabs({
   className?: string;
 }) {
   return (
-    <div className={clsx("inline-flex max-w-full gap-0.5 overflow-x-auto rounded-lg border border-border bg-surface-2 p-0.5", className)}>
+    <div className={clsx("inline-flex max-w-full gap-0.5 overflow-x-auto rounded-full border border-border bg-surface-2 p-[3px]", className)}>
       {items.map((item) => (
         <Link
           key={item.href}
           href={item.href}
           scroll={false}
           className={clsx(
-            "flex h-7 shrink-0 items-center gap-1.5 rounded-md px-2.5 text-xs font-medium whitespace-nowrap transition-colors",
+            "flex h-8 shrink-0 items-center gap-1.5 rounded-full px-3 text-xs font-medium whitespace-nowrap transition-colors",
             item.active ? "bg-surface text-text shadow-card" : "text-muted hover:text-text",
           )}
         >

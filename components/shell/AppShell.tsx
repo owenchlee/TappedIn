@@ -2,169 +2,260 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { clsx } from "clsx";
-import { Briefcase, CalendarDays, House, KanbanSquare, Menu, Search, X } from "lucide-react";
-import { navSections, isActive, type NavItem } from "@/components/shell/nav";
+import { ChevronDown, LayoutGrid, Search, X } from "lucide-react";
+import { PRIMARY_NAV, moreSections, isActive, type NavItem } from "@/components/shell/nav";
 import { ThemeToggle } from "@/components/shell/ThemeToggle";
 import { CommandPalette, openCommandPalette } from "@/components/shell/CommandPalette";
 import { AutoApplyProvider } from "@/components/autoapply/AutoApplyContext";
+import { LogApplicationButton } from "@/components/applications/LogApplicationButton";
 
 export type NavCounts = { newJobs: number; dueSoon: number; actionable: number };
 
 function Logo() {
   return (
-    <Link href="/" className="flex items-center gap-2.5 px-2">
-      <span className="flex size-7 items-center justify-center rounded-lg bg-gradient-to-br from-accent to-violet text-[13px] font-bold text-accent-fg shadow-card">
-        T
-      </span>
-      <span className="text-[15px] font-semibold tracking-tight text-text">TappedIn</span>
+    <Link href="/" className="flex shrink-0 items-center gap-2 rounded-full pr-1">
+      <span className="flex size-8 items-center justify-center rounded-[10px] bg-accent text-sm font-bold text-accent-fg">T</span>
+      <span className="text-base font-semibold tracking-tight text-text">TappedIn</span>
     </Link>
   );
 }
 
-function NavLink({ item, count, onNavigate }: { item: NavItem; count?: number; onNavigate?: () => void }) {
-  const pathname = usePathname();
-  const active = isActive(pathname, item.href);
-  const Icon = item.icon;
+function CountBadge({ count, tone }: { count?: number; tone: "accent" | "urgent" }) {
+  if (count == null || count <= 0) return null;
+  return (
+    <span
+      className={clsx(
+        "min-w-5 rounded-full px-1.5 text-center text-[10px] leading-5 font-semibold tabular-nums",
+        tone === "urgent" ? "bg-urgent/15 text-urgent" : "bg-accent/15 text-accent",
+      )}
+    >
+      {count > 99 ? "99+" : count}
+    </span>
+  );
+}
+
+function TopLink({ item, count }: { item: NavItem; count?: number }) {
+  const active = isActive(usePathname(), item.href);
   return (
     <Link
       href={item.href}
-      onClick={onNavigate}
       aria-current={active ? "page" : undefined}
       className={clsx(
-        "group flex h-8 items-center gap-2.5 rounded-lg px-2 text-sm transition-colors",
+        "flex h-9 items-center gap-1.5 rounded-full px-3.5 text-sm font-medium transition-colors",
         active ? "bg-surface text-text shadow-card ring-1 ring-border" : "text-muted hover:bg-surface-2 hover:text-text",
       )}
     >
-      <Icon className={clsx("size-4 shrink-0", active ? "text-accent" : "text-muted-2 group-hover:text-muted")} />
-      <span className="flex-1 truncate">{item.label}</span>
-      {count != null && count > 0 && (
-        <span
-          className={clsx(
-            "min-w-5 rounded-full px-1.5 text-center text-[10px] leading-5 font-semibold tabular-nums",
-            item.badgeKey === "dueSoon" ? "bg-urgent/15 text-urgent" : "bg-accent/15 text-accent",
-          )}
-        >
-          {count > 99 ? "99+" : count}
-        </span>
-      )}
+      {item.label}
+      <CountBadge count={count} tone={item.badgeKey === "dueSoon" ? "urgent" : "accent"} />
     </Link>
   );
 }
 
-function SidebarContent({ counts, autoApply, onNavigate }: { counts: NavCounts; autoApply: boolean; onNavigate?: () => void }) {
+/** The grouped list of secondary pages, shared by the desktop popover and the mobile sheet. */
+function MoreContent({ autoApply, onNavigate }: { autoApply: boolean; onNavigate: () => void }) {
+  const pathname = usePathname();
   return (
-    <div className="flex h-full flex-col gap-5 px-3 py-4">
-      <Logo />
-      <button
-        type="button"
-        onClick={() => {
-          onNavigate?.();
-          openCommandPalette();
-        }}
-        className="flex h-8 items-center gap-2 rounded-lg border border-border bg-surface px-2.5 text-sm text-muted-2 shadow-card transition-colors hover:border-border-strong hover:text-muted"
-      >
-        <Search className="size-3.5" />
-        <span className="flex-1 text-left">Search…</span>
-        <kbd className="rounded border border-border bg-surface-2 px-1 font-mono text-[10px]">⌘K</kbd>
-      </button>
-      <nav className="flex flex-1 flex-col gap-4 overflow-y-auto">
-        {navSections({ autoApply }).map((section, i) => (
-          <div key={section.label ?? i} className="flex flex-col gap-0.5">
-            {section.label && <div className="px-2 pb-1 text-[11px] font-medium tracking-wide text-muted-2 uppercase">{section.label}</div>}
-            {section.items.map((item) => (
-              <NavLink key={item.href} item={item} count={item.badgeKey ? counts[item.badgeKey] : undefined} onNavigate={onNavigate} />
-            ))}
+    <div className="flex flex-col gap-5">
+      <div className="grid grid-cols-1 gap-5 sm:grid-cols-3">
+        {moreSections({ autoApply }).map((section) => (
+          <div key={section.label}>
+            <p className="mb-1.5 px-2 text-[11px] font-semibold tracking-wide text-muted-2 uppercase">{section.label}</p>
+            <div className="flex flex-col gap-0.5">
+              {section.items.map((item) => {
+                const Icon = item.icon;
+                const active = isActive(pathname, item.href);
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    onClick={onNavigate}
+                    aria-current={active ? "page" : undefined}
+                    className={clsx(
+                      "flex items-start gap-3 rounded-xl px-2 py-2 transition-colors",
+                      active ? "bg-accent-soft" : "hover:bg-surface-2",
+                    )}
+                  >
+                    <span className={clsx("flex size-8 shrink-0 items-center justify-center rounded-lg", active ? "bg-accent text-accent-fg" : "bg-surface-2 text-muted")}>
+                      <Icon className="size-4" />
+                    </span>
+                    <span className="min-w-0">
+                      <span className="block text-sm font-medium text-text">{item.label}</span>
+                      {item.hint && <span className="block text-xs leading-snug text-muted-2">{item.hint}</span>}
+                    </span>
+                  </Link>
+                );
+              })}
+            </div>
           </div>
         ))}
-      </nav>
-      <ThemeToggle />
+      </div>
+      <div className="flex items-center justify-between gap-3 border-t border-border pt-4">
+        <span className="text-xs font-medium text-muted">Appearance</span>
+        <div className="w-36">
+          <ThemeToggle />
+        </div>
+      </div>
     </div>
   );
 }
 
-const MOBILE_TABS = [
-  { href: "/", label: "Today", icon: House },
-  { href: "/jobs", label: "Jobs", icon: Briefcase },
-  { href: "/applications", label: "Apps", icon: KanbanSquare },
-  { href: "/calendar", label: "Calendar", icon: CalendarDays },
-];
-
-export function AppShell({ children, counts, autoApply }: { children: React.ReactNode; counts: NavCounts; autoApply: boolean }) {
+function DesktopMore({ autoApply }: { autoApply: boolean }) {
   const pathname = usePathname();
-  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  const inMore = moreSections({ autoApply }).some((s) => s.items.some((i) => isActive(pathname, i.href)));
 
   useEffect(() => {
-    document.body.style.overflow = drawerOpen ? "hidden" : "";
-  }, [drawerOpen]);
+    if (!open) return;
+    const onDown = (e: MouseEvent) => {
+      if (!ref.current?.contains(e.target as Node)) setOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
+    document.addEventListener("mousedown", onDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        type="button"
+        aria-expanded={open}
+        onClick={() => setOpen((o) => !o)}
+        className={clsx(
+          "flex h-9 items-center gap-1 rounded-full px-3.5 text-sm font-medium transition-colors",
+          open || inMore ? "bg-surface text-text shadow-card ring-1 ring-border" : "text-muted hover:bg-surface-2 hover:text-text",
+        )}
+      >
+        More
+        <ChevronDown className={clsx("size-3.5 transition-transform duration-200", open && "rotate-180")} />
+      </button>
+      {open && (
+        <div className="animate-pop-in absolute top-full left-1/2 z-30 mt-2 w-[720px] -translate-x-1/2 rounded-3xl border border-border bg-surface p-5 shadow-pop">
+          <MoreContent autoApply={autoApply} onNavigate={() => setOpen(false)} />
+        </div>
+      )}
+    </div>
+  );
+}
+
+export function AppShell({
+  children,
+  counts,
+  autoApply,
+  defaultTerm,
+}: {
+  children: React.ReactNode;
+  counts: NavCounts;
+  autoApply: boolean;
+  defaultTerm: string;
+}) {
+  const pathname = usePathname();
+  const [sheetOpen, setSheetOpen] = useState(false);
+
+  useEffect(() => {
+    document.body.style.overflow = sheetOpen ? "hidden" : "";
+  }, [sheetOpen]);
 
   return (
     <div className="min-h-dvh">
-      {/* Desktop sidebar */}
-      <aside className="fixed inset-y-0 left-0 z-20 hidden w-60 border-r border-border bg-bg-elevated/70 backdrop-blur-xl lg:block">
-        <SidebarContent counts={counts} autoApply={autoApply} />
-      </aside>
+      <a
+        href="#main"
+        className="sr-only z-50 rounded-full bg-accent px-4 py-2 text-sm font-medium text-accent-fg focus:not-sr-only focus:fixed focus:top-3 focus:left-3"
+      >
+        Skip to content
+      </a>
 
-      {/* Mobile top bar */}
-      <header className="sticky top-0 z-20 flex h-14 items-center justify-between border-b border-border bg-bg/80 px-4 backdrop-blur-xl lg:hidden">
-        <Logo />
-        <button
-          type="button"
-          onClick={openCommandPalette}
-          aria-label="Search"
-          className="flex size-9 items-center justify-center rounded-lg text-muted hover:bg-surface-2 hover:text-text"
-        >
-          <Search className="size-4.5" />
-        </button>
-      </header>
-
-      {/* Mobile drawer */}
-      {drawerOpen && (
-        <div className="fixed inset-0 z-40 lg:hidden">
-          <button type="button" aria-label="Close menu" className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setDrawerOpen(false)} />
-          <div className="animate-pop-in absolute inset-y-0 left-0 w-72 border-r border-border bg-bg-elevated shadow-pop">
+      <header className="sticky top-0 z-20 border-b border-border bg-bg/80 backdrop-blur-xl">
+        <div className="mx-auto flex h-16 max-w-6xl items-center gap-2 px-4 sm:px-6">
+          <Logo />
+          <nav aria-label="Main" className="ml-6 hidden items-center gap-1 lg:flex">
+            {PRIMARY_NAV.map((item) => (
+              <TopLink key={item.href} item={item} count={item.badgeKey ? counts[item.badgeKey] : undefined} />
+            ))}
+            <DesktopMore autoApply={autoApply} />
+          </nav>
+          <div className="ml-auto flex items-center gap-2">
             <button
               type="button"
-              aria-label="Close menu"
-              onClick={() => setDrawerOpen(false)}
-              className="absolute top-4 right-3 flex size-8 items-center justify-center rounded-lg text-muted hover:bg-surface-2"
+              onClick={openCommandPalette}
+              aria-label="Search"
+              className="flex size-10 items-center justify-center rounded-full text-muted transition-colors hover:bg-surface-2 hover:text-text md:w-56 md:justify-start md:gap-2 md:border md:border-border md:bg-surface md:px-3.5 md:text-sm md:text-muted-2 md:shadow-card"
             >
-              <X className="size-4" />
+              <Search className="size-4 shrink-0" />
+              <span className="hidden flex-1 text-left md:inline">Search anything</span>
+              <kbd className="hidden rounded-md border border-border bg-surface-2 px-1.5 font-mono text-[10px] md:inline">Ctrl K</kbd>
             </button>
-            <SidebarContent counts={counts} autoApply={autoApply} onNavigate={() => setDrawerOpen(false)} />
+            <LogApplicationButton defaultTerm={defaultTerm} label="Add" />
           </div>
         </div>
-      )}
+      </header>
 
-      <main className="px-4 pt-6 pb-28 sm:px-6 lg:ml-60 lg:px-10 lg:pt-10 lg:pb-16">
+      <main id="main" className="px-4 pt-8 pb-32 sm:px-6 lg:pt-12 lg:pb-20">
         <div className="mx-auto max-w-6xl">
           <AutoApplyProvider value={autoApply}>{children}</AutoApplyProvider>
         </div>
       </main>
 
-      {/* Mobile bottom tabs */}
-      <nav className="fixed inset-x-0 bottom-0 z-20 grid grid-cols-5 border-t border-border bg-bg/85 pb-[env(safe-area-inset-bottom)] backdrop-blur-xl lg:hidden">
-        {MOBILE_TABS.map((tab) => {
+      {/* Mobile: More sheet */}
+      {sheetOpen && (
+        <div className="fixed inset-0 z-40 lg:hidden" role="dialog" aria-modal="true" aria-label="More pages">
+          <button type="button" aria-label="Close" className="absolute inset-0 bg-black/45 backdrop-blur-sm" onClick={() => setSheetOpen(false)} />
+          <div className="animate-pop-in absolute inset-x-0 bottom-0 max-h-[85dvh] overflow-y-auto rounded-t-3xl border-t border-border bg-surface px-4 pt-3 pb-[calc(1.25rem+env(safe-area-inset-bottom))] shadow-pop">
+            <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-border-strong" />
+            <div className="mb-4 flex items-center justify-between">
+              <h2 className="text-lg font-semibold">More</h2>
+              <button
+                type="button"
+                aria-label="Close"
+                onClick={() => setSheetOpen(false)}
+                className="flex size-10 items-center justify-center rounded-full text-muted hover:bg-surface-2"
+              >
+                <X className="size-5" />
+              </button>
+            </div>
+            <MoreContent autoApply={autoApply} onNavigate={() => setSheetOpen(false)} />
+          </div>
+        </div>
+      )}
+
+      {/* Mobile: bottom tabs */}
+      <nav
+        aria-label="Main"
+        className="fixed inset-x-0 bottom-0 z-20 grid grid-cols-5 border-t border-border bg-bg/90 pb-[env(safe-area-inset-bottom)] backdrop-blur-xl lg:hidden"
+      >
+        {PRIMARY_NAV.map((tab) => {
           const active = isActive(pathname, tab.href);
           const Icon = tab.icon;
+          const count = tab.badgeKey ? counts[tab.badgeKey] : 0;
           return (
             <Link
               key={tab.href}
               href={tab.href}
-              className={clsx("flex h-14 flex-col items-center justify-center gap-0.5 text-[10px] font-medium", active ? "text-accent" : "text-muted-2")}
+              aria-current={active ? "page" : undefined}
+              className={clsx("relative flex h-16 flex-col items-center justify-center gap-1 text-[11px] font-medium", active ? "text-accent" : "text-muted-2")}
             >
-              <Icon className="size-5" />
-              {tab.label}
+              <span className={clsx("flex h-7 w-12 items-center justify-center rounded-full transition-colors", active && "bg-accent-soft")}>
+                <Icon className="size-5" />
+              </span>
+              {tab.label === "Applications" ? "Apps" : tab.label}
+              {count > 0 && <span className="absolute top-2.5 left-1/2 ml-3 size-2 rounded-full bg-accent ring-2 ring-bg" />}
             </Link>
           );
         })}
         <button
           type="button"
-          onClick={() => setDrawerOpen(true)}
-          className="flex h-14 flex-col items-center justify-center gap-0.5 text-[10px] font-medium text-muted-2"
+          onClick={() => setSheetOpen(true)}
+          className="flex h-16 flex-col items-center justify-center gap-1 text-[11px] font-medium text-muted-2"
         >
-          <Menu className="size-5" />
+          <span className="flex h-7 w-12 items-center justify-center">
+            <LayoutGrid className="size-5" />
+          </span>
           More
         </button>
       </nav>

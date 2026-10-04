@@ -26,7 +26,7 @@ export function JobRow({ job, isNew }: { job: JobRowData; isNew: boolean }) {
   return (
     <li
       className={clsx(
-        "group relative flex gap-3 border-b border-border px-4 py-3.5 transition-colors last:border-0 hover:bg-surface-2/50 sm:gap-4",
+        "group relative flex gap-3 border-b border-border px-4 py-4 transition-colors last:border-0 hover:bg-surface-2/60 sm:gap-4 sm:px-5",
         possiblyClosed && "opacity-70",
       )}
     >
@@ -34,11 +34,11 @@ export function JobRow({ job, isNew }: { job: JobRowData; isNew: boolean }) {
       <div className="min-w-0 flex-1">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <a href={job.url} target="_blank" rel="noopener noreferrer" className="text-sm leading-snug font-medium text-text hover:text-accent">
+            <a href={job.url} target="_blank" rel="noopener noreferrer" className="text-[15px] leading-snug font-semibold text-text hover:text-accent">
               {job.role}
             </a>
-            <p className="mt-0.5 truncate text-xs text-muted">
-              <span className="font-medium text-text/80">{job.company}</span>
+            <p className="mt-0.5 truncate text-sm text-muted">
+              <span className="font-medium text-text/85">{job.company}</span>
               {job.location ? ` · ${job.location}` : ""}
             </p>
           </div>
@@ -53,16 +53,17 @@ export function JobRow({ job, isNew }: { job: JobRowData; isNew: boolean }) {
                   type="button"
                   disabled={isPending}
                   title="Save for later"
-                  aria-label="Save for later"
                   onClick={() =>
                     startTransition(async () => {
                       setTracked({ id: "pending", status: "interested" });
                       await toggleSave("coop", job.id);
                     })
                   }
-                  className="flex size-8 items-center justify-center rounded-lg text-muted-2 hover:bg-surface-3 hover:text-text"
+                  className="flex h-9 items-center gap-1.5 rounded-full px-3 text-sm font-medium text-muted ring-1 ring-border ring-inset transition-colors hover:bg-surface-3 hover:text-text"
                 >
                   <Bookmark className="size-4" />
+                  <span className="hidden sm:inline">Save</span>
+                  <span className="sr-only sm:hidden">Save for later</span>
                 </button>
                 <button
                   type="button"
@@ -74,10 +75,10 @@ export function JobRow({ job, isNew }: { job: JobRowData; isNew: boolean }) {
                       await trackPosting(job.id, "applied");
                     })
                   }
-                  className="hidden h-8 items-center gap-1.5 rounded-lg px-2.5 text-xs font-medium text-muted ring-1 ring-border ring-inset hover:bg-surface-3 hover:text-text sm:flex"
+                  className="hidden h-9 items-center gap-1.5 rounded-full px-3 text-sm font-medium text-muted ring-1 ring-border ring-inset transition-colors hover:bg-surface-3 hover:text-text sm:flex"
                 >
-                  <Send className="size-3.5" />
-                  Applied
+                  <Send className="size-4" />
+                  I applied
                 </button>
               </>
             )}
@@ -87,34 +88,39 @@ export function JobRow({ job, isNew }: { job: JobRowData; isNew: boolean }) {
               target="_blank"
               rel="noopener noreferrer"
               aria-label="Open posting"
-              className="flex size-8 items-center justify-center rounded-lg text-muted-2 hover:bg-surface-3 hover:text-text"
+              title="Open posting"
+              className="flex size-9 items-center justify-center rounded-full text-muted-2 transition-colors hover:bg-surface-3 hover:text-text"
             >
               <ExternalLink className="size-4" />
             </a>
           </div>
         </div>
-        <div className="mt-2 flex flex-wrap items-center gap-1">
+        <div className="mt-2 flex flex-wrap items-center gap-1.5">
           {isNew && <Badge variant="new">New</Badge>}
           {job.terms.map((t) => (
             <Badge key={t} variant="accent">
               {termShortLabel(t)}
             </Badge>
           ))}
-          {job.category && job.category !== "other" && <Badge>{JOB_CATEGORY_LABELS[job.category as JobCategory]}</Badge>}
-          {job.region && job.region !== "canada" && <Badge>{REGION_LABELS[job.region as Region]}</Badge>}
           <DeadlineBadge deadline={job.deadline} />
-          {sourceCount > 1 && (
-            <Badge title="Listed by several sources — shown once">
-              <Layers className="size-3" />
-              {sourceCount} sources
-            </Badge>
-          )}
-          <span className="ml-1 text-[11px] text-muted-2">
-            {job.origin === "manual" ? "added by you" : (job.source?.name ?? "")} · {relativeTime(job.postedAt && job.postedAt < job.firstSeenAt ? job.postedAt : job.firstSeenAt)}
+          <span className="ml-1 text-xs text-muted-2">
+            {[
+              job.category && job.category !== "other" ? JOB_CATEGORY_LABELS[job.category as JobCategory] : null,
+              job.region && job.region !== "canada" ? REGION_LABELS[job.region as Region] : null,
+              relativeTime(job.postedAt && job.postedAt < job.firstSeenAt ? job.postedAt : job.firstSeenAt),
+            ]
+              .filter(Boolean)
+              .join(" · ")}
           </span>
+          {sourceCount > 1 && (
+            <span className="inline-flex items-center gap-1 text-xs text-muted-2" title={`Listed by ${sourceCount} sources (${job.origin === "manual" ? "added by you" : (job.source?.name ?? "")} first). Shown once.`}>
+              · <Layers className="size-3" />
+              {sourceCount}
+            </span>
+          )}
         </div>
         {possiblyClosed && (
-          <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted">
+          <div className="mt-2.5 flex flex-wrap items-center gap-3 rounded-xl bg-surface-2 px-3 py-2 text-sm text-muted">
             <span>Dropped off its source — possibly closed.</span>
             <button type="button" className="font-medium text-accent hover:underline" onClick={() => startTransition(() => resolveDisappeared(job.id, "open"))}>
               <Check className="mr-0.5 inline size-3" />

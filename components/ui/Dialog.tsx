@@ -34,13 +34,13 @@ export function Dialog({
       onClick={(e) => {
         if (e.target === ref.current) onClose();
       }}
-      className={`m-auto w-[min(var(--w),calc(100vw-2rem))] rounded-2xl border border-border bg-surface p-0 text-text shadow-pop open:animate-pop-in ${wide ? "[--w:720px]" : "[--w:520px]"}`}
+      className={`m-auto w-[min(var(--w),calc(100vw-2rem))] rounded-3xl border border-border bg-surface p-0 text-text shadow-pop open:animate-pop-in ${wide ? "[--w:720px]" : "[--w:520px]"}`}
     >
       {open && (
-        <div className="p-5">
+        <div className="p-6">
           <div className="mb-4 flex items-start justify-between gap-4">
             <div>
-              <h2 className="text-base font-semibold tracking-tight">{title}</h2>
+              <h2 className="text-lg font-semibold tracking-tight">{title}</h2>
               {description && <p className="mt-0.5 text-sm text-muted">{description}</p>}
             </div>
             <button

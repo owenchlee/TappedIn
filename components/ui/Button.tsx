@@ -12,14 +12,14 @@ export const BUTTON_VARIANTS: Record<Variant, string> = {
 };
 
 export const BUTTON_SIZES: Record<Size, string> = {
-  xs: "h-7 px-2 text-xs gap-1",
-  sm: "h-8 px-2.5 text-xs gap-1.5",
-  md: "h-9 px-3.5 text-sm gap-2",
+  xs: "h-7 px-2.5 text-xs gap-1",
+  sm: "h-8 px-3 text-xs gap-1.5",
+  md: "h-10 px-4 text-sm gap-2",
 };
 
 export function buttonClasses(variant: Variant = "secondary", size: Size = "md", className?: string) {
   return clsx(
-    "inline-flex shrink-0 items-center justify-center rounded-lg font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50 [&_svg]:size-4",
+    "inline-flex shrink-0 items-center justify-center rounded-full font-medium transition-[color,background-color,transform] duration-150 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 [&_svg]:size-4",
     BUTTON_VARIANTS[variant],
     BUTTON_SIZES[size],
     className,

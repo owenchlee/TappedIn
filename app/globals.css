@@ -7,94 +7,91 @@
    light) or when the user picked dark explicitly. Components only ever use the semantic names.
    --------------------------------------------------------------------------------------------- */
 :root {
-  --bg: #f6f6f8;
-  --bg-elevated: #fbfbfc;
+  --bg: #f7f7f5;
+  --bg-elevated: #fbfbfa;
   --surface: #ffffff;
-  --surface-2: #f2f2f5;
-  --surface-3: #e9e9ee;
-  --border: #e6e6ec;
-  --border-strong: #d3d3db;
-  --text: #16161a;
-  --muted: #55555f;
-  --muted-2: #8b8b96;
-  --accent: #6552e8;
-  --accent-hover: #5540df;
-  --accent-soft: #eeebfd;
+  --surface-2: #f2f2ef;
+  --surface-3: #e8e8e4;
+  --border: #e7e7e2;
+  --border-strong: #d6d6d0;
+  --text: #191a18;
+  --muted: #565852;
+  --muted-2: #7b7d76;
+  --accent: #0f766e;
+  --accent-hover: #115e59;
+  --accent-soft: #e5f3f0;
   --accent-fg: #ffffff;
-  --urgent: #c77700;
-  --overdue: #d92d4f;
-  --new: #0f9f6e;
-  --sky: #0a84c6;
-  --violet: #7c4ddb;
-  --amber: #c77700;
-  --emerald: #0f9f6e;
-  --rose: #d92d4f;
+  --urgent: #b45309;
+  --overdue: #dc2626;
+  --new: #059669;
+  --sky: #0369a1;
+  --violet: #7c3aed;
+  --amber: #b45309;
+  --emerald: #047857;
+  --rose: #e11d48;
   --zinc: #71717a;
-  --shadow: 0 1px 2px rgb(16 16 24 / 0.04), 0 1px 1px rgb(16 16 24 / 0.02);
-  --shadow-lg: 0 12px 32px -8px rgb(16 16 24 / 0.18), 0 2px 6px rgb(16 16 24 / 0.06);
-  --glow: radial-gradient(1200px 500px at 15% -10%, rgb(101 82 232 / 0.07), transparent 60%);
+  --shadow: 0 1px 2px rgb(24 24 20 / 0.04), 0 1px 3px rgb(24 24 20 / 0.03);
+  --shadow-lg: 0 16px 40px -12px rgb(24 24 20 / 0.18), 0 2px 6px rgb(24 24 20 / 0.05);
   color-scheme: light;
 }
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --bg: #09090b;
-    --bg-elevated: #0e0e11;
-    --surface: #121215;
-    --surface-2: #19191e;
-    --surface-3: #222228;
-    --border: #232329;
-    --border-strong: #31313a;
-    --text: #f4f4f6;
-    --muted: #a3a3ad;
-    --muted-2: #6f6f7a;
-    --accent: #8f7ffb;
-    --accent-hover: #a597fc;
-    --accent-soft: #1d1a33;
-    --accent-fg: #0b0a14;
-    --urgent: #f5b83d;
-    --overdue: #fb6f8a;
+    --bg: #0e0f0f;
+    --bg-elevated: #121413;
+    --surface: #161817;
+    --surface-2: #1d201f;
+    --surface-3: #272a29;
+    --border: #252827;
+    --border-strong: #353937;
+    --text: #f2f2ef;
+    --muted: #a9aca6;
+    --muted-2: #7d817b;
+    --accent: #2dd4bf;
+    --accent-hover: #5eead4;
+    --accent-soft: #0f2a27;
+    --accent-fg: #04201c;
+    --urgent: #fbbf24;
+    --overdue: #f87171;
     --new: #34d399;
-    --sky: #5ab8f0;
-    --violet: #b08cff;
-    --amber: #f5b83d;
+    --sky: #7dd3fc;
+    --violet: #c4b5fd;
+    --amber: #fbbf24;
     --emerald: #34d399;
-    --rose: #fb6f8a;
-    --zinc: #9d9da8;
+    --rose: #fb7185;
+    --zinc: #a1a1aa;
     --shadow: 0 1px 2px rgb(0 0 0 / 0.4);
-    --shadow-lg: 0 16px 40px -8px rgb(0 0 0 / 0.6), 0 2px 8px rgb(0 0 0 / 0.4);
-    --glow: radial-gradient(1200px 500px at 15% -10%, rgb(143 127 251 / 0.09), transparent 60%);
+    --shadow-lg: 0 20px 48px -12px rgb(0 0 0 / 0.7), 0 2px 8px rgb(0 0 0 / 0.4);
     color-scheme: dark;
   }
 }
 
 :root[data-theme="dark"] {
-  --bg: #09090b;
-  --bg-elevated: #0e0e11;
-  --surface: #121215;
-  --surface-2: #19191e;
-  --surface-3: #222228;
-  --border: #232329;
-  --border-strong: #31313a;
-  --text: #f4f4f6;
-  --muted: #a3a3ad;
-  --muted-2: #6f6f7a;
-  --accent: #8f7ffb;
-  --accent-hover: #a597fc;
-  --accent-soft: #1d1a33;
-  --accent-fg: #0b0a14;
-  --urgent: #f5b83d;
-  --overdue: #fb6f8a;
+  --bg: #0e0f0f;
+  --bg-elevated: #121413;
+  --surface: #161817;
+  --surface-2: #1d201f;
+  --surface-3: #272a29;
+  --border: #252827;
+  --border-strong: #353937;
+  --text: #f2f2ef;
+  --muted: #a9aca6;
+  --muted-2: #7d817b;
+  --accent: #2dd4bf;
+  --accent-hover: #5eead4;
+  --accent-soft: #0f2a27;
+  --accent-fg: #04201c;
+  --urgent: #fbbf24;
+  --overdue: #f87171;
   --new: #34d399;
-  --sky: #5ab8f0;
-  --violet: #b08cff;
-  --amber: #f5b83d;
+  --sky: #7dd3fc;
+  --violet: #c4b5fd;
+  --amber: #fbbf24;
   --emerald: #34d399;
-  --rose: #fb6f8a;
-  --zinc: #9d9da8;
+  --rose: #fb7185;
+  --zinc: #a1a1aa;
   --shadow: 0 1px 2px rgb(0 0 0 / 0.4);
-  --shadow-lg: 0 16px 40px -8px rgb(0 0 0 / 0.6), 0 2px 8px rgb(0 0 0 / 0.4);
-  --glow: radial-gradient(1200px 500px at 15% -10%, rgb(143 127 251 / 0.09), transparent 60%);
+  --shadow-lg: 0 20px 48px -12px rgb(0 0 0 / 0.7), 0 2px 8px rgb(0 0 0 / 0.4);
   color-scheme: dark;
 }
 
@@ -133,14 +130,22 @@ html {
 }
 
 body {
-  background: var(--glow), var(--bg);
-  background-attachment: fixed;
+  background: var(--bg);
   color: var(--text);
   font-feature-settings: "cv11", "ss01";
 }
 
 * {
   border-color: var(--border);
+}
+
+a,
+button,
+summary,
+select,
+[role="button"] {
+  cursor: pointer;
+  touch-action: manipulation;
 }
 
 ::selection {

@@ -48,15 +48,15 @@ export function ApplicationCard({
         e.dataTransfer.effectAllowed = "move";
       }}
       className={clsx(
-        "group relative rounded-xl border border-border bg-surface p-3 shadow-card transition-all hover:border-border-strong hover:shadow-pop",
+        "group relative rounded-2xl border border-border bg-surface p-3.5 shadow-card transition-[border-color,box-shadow] duration-200 hover:border-border-strong hover:shadow-pop",
         draggable && "cursor-grab active:cursor-grabbing",
       )}
     >
-      <Link href={`/applications/${app.id}`} className="absolute inset-0 rounded-xl" aria-label={`${app.title} at ${app.company}`} />
+      <Link href={`/applications/${app.id}`} className="absolute inset-0 rounded-2xl" aria-label={`${app.title} at ${app.company}`} />
       <div className="flex items-start gap-2.5">
         <CompanyLogo name={app.entityKind === "coop" ? app.company : app.title} url={app.url} size="sm" />
         <div className="min-w-0 flex-1">
-          <p className="line-clamp-2 text-[13px] leading-snug font-medium text-text">{app.title}</p>
+          <p className="line-clamp-2 text-sm leading-snug font-medium text-text">{app.title}</p>
           <p className="truncate text-xs text-muted">{app.company}</p>
         </div>
       </div>
@@ -138,24 +138,24 @@ export function ApplicationBoard({ apps }: { apps: ApplicationView[] }) {
                   if (id) move(id, stage);
                 }}
                 className={clsx(
-                  "flex min-h-72 flex-col rounded-2xl border p-2 transition-colors",
-                  dragOver === stage ? "border-accent/50 bg-accent-soft/60" : "border-border/70 bg-surface-2/50",
+                  "flex min-h-80 flex-col rounded-3xl border p-2 transition-colors",
+                  dragOver === stage ? "border-accent/50 bg-accent-soft" : "border-transparent bg-surface-2/70",
                 )}
               >
-                <header className="mb-2 px-1.5 pt-1">
+                <header className="mb-3 px-2 pt-2">
                   <div className="flex items-center gap-2">
                     <span className={clsx("size-2 rounded-full", statusDotClass(stage))} />
-                    <h3 className="text-[13px] font-semibold">{stageLabel(stage)}</h3>
+                    <h3 className="text-sm font-semibold">{stageLabel(stage)}</h3>
                     <span className="text-xs text-muted-2 tabular-nums">{cards.length}</span>
                   </div>
-                  <p className="mt-0.5 text-[11px] text-muted-2">{COLUMN_HINT[stage]}</p>
+                  <p className="mt-0.5 text-xs text-muted-2">{COLUMN_HINT[stage]}</p>
                 </header>
                 <div className="flex flex-col gap-2">
                   {cards.map((app) => (
                     <ApplicationCard key={app.id} app={app} onStage={move} draggable />
                   ))}
                   {cards.length === 0 && (
-                    <div className="rounded-xl border border-dashed border-border px-3 py-6 text-center text-[11px] text-muted-2">Drop here</div>
+                    <div className="rounded-2xl border border-dashed border-border-strong/70 px-3 py-8 text-center text-xs text-muted-2">Drop here</div>
                   )}
                 </div>
               </section>

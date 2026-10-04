@@ -33,7 +33,7 @@ export function AgendaRow({ item }: { item: AgendaItem }) {
   const style = AGENDA_STYLE[item.kind];
   const Icon = style.icon;
   return (
-    <Link href={item.href} className="group flex items-center gap-3 rounded-lg px-2 py-2 transition-colors hover:bg-surface-2">
+    <Link href={item.href} className="group flex items-center gap-3 rounded-xl px-3 py-2.5 transition-colors hover:bg-surface-2">
       {item.logoName ? (
         <span className="relative">
           <CompanyLogo name={item.logoName} url={item.logoUrl} size="sm" />
@@ -66,7 +66,7 @@ export function AgendaList({ items, empty }: { items: AgendaItem[]; empty?: Reac
     <div className="space-y-4">
       {[...groups].map(([heading, group]) => (
         <div key={heading}>
-          <h3 className={clsx("mb-1 px-2 text-xs font-semibold", heading === "Overdue" ? "text-overdue" : heading === "Today" ? "text-accent" : "text-muted-2")}>
+          <h3 className={clsx("mb-1 px-3 pt-1 text-xs font-semibold", heading === "Overdue" ? "text-overdue" : heading === "Today" ? "text-accent" : "text-muted-2")}>
             {heading}
           </h3>
           <div className="space-y-0.5">

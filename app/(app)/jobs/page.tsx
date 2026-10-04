@@ -1,18 +1,19 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { clsx } from "clsx";
 import { Briefcase, ChevronLeft, ChevronRight, Sparkles } from "lucide-react";
 import { listJobs, listJobTerms, parseJobFilters } from "@/lib/data/jobs";
 import { jobsSeenAt } from "@/lib/data/nav";
 import { JobRow } from "@/components/jobs/JobRow";
 import { MarkJobsSeen } from "@/components/jobs/MarkJobsSeen";
-import { LogApplicationButton } from "@/components/applications/LogApplicationButton";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { EmptyState } from "@/components/ui/EmptyState";
-import { LinkTabs, withParams } from "@/components/ui/LinkTabs";
+import { withParams } from "@/components/ui/LinkTabs";
+import { FilterSelect } from "@/components/ui/FilterSelect";
 import { SearchBox } from "@/components/SearchBox";
 import { buttonClasses } from "@/components/ui/Button";
 import { JOB_CATEGORIES, JOB_CATEGORY_LABELS } from "@/lib/types";
-import { nextTerm, termForDate, termShortLabel } from "@/lib/terms";
+import { termShortLabel } from "@/lib/terms";
 import { prisma } from "@/lib/db";
 import { relativeTime } from "@/lib/format";
 
@@ -49,6 +50,8 @@ export default async function JobsPage({ searchParams }: PageProps<"/jobs">) {
   };
   const href = (changes: Record<string, string | undefined>) => withParams("/jobs", current, { page: undefined, ...changes });
 
+  const filtersSet = Boolean(current.q || current.region || current.term || current.category || current.new || current.sort);
+
   return (
     <div>
       <MarkJobsSeen />
@@ -56,81 +59,92 @@ export default async function JobsPage({ searchParams }: PageProps<"/jobs">) {
         title="Jobs"
         description={
           <>
-            Internships and co-ops from curated lists and company boards, deduplicated — every job appears once.
+            Every internship and co-op we could find, each listed once.
             {lastRun?.lastRunAt && <span className="text-muted-2"> Updated {relativeTime(lastRun.lastRunAt)}.</span>}
           </>
         }
-        actions={<LogApplicationButton defaultTerm={nextTerm(termForDate(new Date()))} label="Add from WaterlooWorks" />}
       />
 
-      <div className="mb-4 flex flex-col gap-3">
-        <div className="flex flex-wrap items-center gap-2">
-          <SearchBox placeholder="Company, role, city…" className="w-full sm:w-auto" />
-          <LinkTabs
-            items={REGION_PRESETS.map((r) => ({
-              href: href({ region: r.value }),
-              label: r.label,
-              active: (current.region ?? undefined) === r.value,
-            }))}
-          />
+      <div className="mb-3 flex flex-col gap-3 lg:flex-row lg:items-center">
+        <SearchBox placeholder="Search company, role or city" className="lg:w-80" />
+        <div className="-mx-4 flex items-center gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0 sm:pb-0">
           <Link
             href={href({ new: f.onlyNew ? undefined : "1" })}
             scroll={false}
-            className={buttonClasses(f.onlyNew ? "primary" : "secondary", "sm", "h-8")}
+            aria-pressed={f.onlyNew}
+            className={clsx(
+              "inline-flex h-10 shrink-0 items-center gap-1.5 rounded-full border px-4 text-sm font-medium transition-colors",
+              f.onlyNew ? "border-accent bg-accent text-accent-fg" : "border-border bg-surface text-text shadow-card hover:border-border-strong",
+            )}
           >
-            <Sparkles />
-            {newCount} new
+            <Sparkles className="size-4" />
+            New
+            <span className={clsx("tabular-nums", f.onlyNew ? "opacity-80" : "text-muted-2")}>{newCount}</span>
           </Link>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
+          <FilterSelect
+            label="Region"
+            options={REGION_PRESETS.map((r) => ({ href: href({ region: r.value }), label: r.label, active: (current.region ?? undefined) === r.value }))}
+          />
           {terms.length > 0 && (
-            <LinkTabs
-              items={[
+            <FilterSelect
+              label="Term"
+              options={[
                 { href: href({ term: undefined }), label: "Any term", active: !f.term },
                 ...terms.slice(0, 6).map((t) => ({ href: href({ term: t }), label: termShortLabel(t), active: f.term === t })),
               ]}
             />
           )}
-          <LinkTabs
-            items={[
+          <FilterSelect
+            label="Role"
+            options={[
               { href: href({ category: undefined }), label: "All roles", active: !f.category },
-              ...JOB_CATEGORIES.filter((c) => c !== "other").map((c) => ({
-                href: href({ category: c }),
-                label: JOB_CATEGORY_LABELS[c],
-                active: f.category === c,
-              })),
+              ...JOB_CATEGORIES.filter((c) => c !== "other").map((c) => ({ href: href({ category: c }), label: JOB_CATEGORY_LABELS[c], active: f.category === c })),
             ]}
           />
-          <div className="ml-auto flex flex-wrap items-center gap-2">
-            <LinkTabs
-              items={[
-                { href: href({ sort: undefined }), label: "Newest", active: f.sort === "new" },
-                { href: href({ sort: "deadline" }), label: "Deadline", active: f.sort === "deadline" },
-              ]}
-            />
-            <Link href={href({ tracked: f.hideTracked ? undefined : "hide" })} scroll={false} className="text-xs text-muted hover:text-text">
-              {f.hideTracked ? "Show tracked" : "Hide tracked"}
-            </Link>
-            <Link href={href({ closed: f.showClosed ? undefined : "1" })} scroll={false} className="text-xs text-muted hover:text-text">
-              {f.showClosed ? "Hide closed" : "Show closed"}
-            </Link>
-          </div>
+          <FilterSelect
+            label="Sort"
+            options={[
+              { href: href({ sort: undefined }), label: "Newest first", active: f.sort === "new" },
+              { href: href({ sort: "deadline" }), label: "Deadline first", active: f.sort === "deadline" },
+            ]}
+          />
         </div>
       </div>
 
-      <p className="mb-2 text-xs text-muted-2 tabular-nums">
-        {total.toLocaleString()} {total === 1 ? "job" : "jobs"}
-        {pages > 1 ? ` · page ${f.page} of ${pages}` : ""}
-      </p>
+      <div className="mb-3 flex flex-wrap items-center gap-x-4 gap-y-1 px-1 text-sm">
+        <span className="text-muted tabular-nums">
+          {total.toLocaleString()} {total === 1 ? "job" : "jobs"}
+        </span>
+        {filtersSet && (
+          <Link href="/jobs" scroll={false} className="font-medium text-accent hover:text-accent-hover">
+            Clear filters
+          </Link>
+        )}
+        <span className="ml-auto flex gap-4">
+          <Link href={href({ tracked: f.hideTracked ? undefined : "hide" })} scroll={false} className="text-muted hover:text-text">
+            {f.hideTracked ? "Show ones I track" : "Hide ones I track"}
+          </Link>
+          <Link href={href({ closed: f.showClosed ? undefined : "1" })} scroll={false} className="text-muted hover:text-text">
+            {f.showClosed ? "Hide closed" : "Show closed"}
+          </Link>
+        </span>
+      </div>
 
       {items.length === 0 ? (
         <EmptyState
           icon={Briefcase}
           title={total === 0 && !f.q ? "No jobs match these filters" : "Nothing found"}
-          description="Try a different term or region — or check Sources if you expected fresh postings."
+          description="Try a different term or region, or clear the filters."
+          action={
+            filtersSet ? (
+              <Link href="/jobs" className={buttonClasses("secondary", "md")}>
+                Clear filters
+              </Link>
+            ) : undefined
+          }
         />
       ) : (
-        <ul className="overflow-hidden rounded-xl border border-border bg-surface shadow-card">
+        <ul className="overflow-hidden rounded-2xl border border-border bg-surface shadow-card">
           {items.map((job) => (
             <JobRow key={job.id} job={job} isNew={job.firstSeenAt > seenAt} />
           ))}
@@ -138,18 +152,18 @@ export default async function JobsPage({ searchParams }: PageProps<"/jobs">) {
       )}
 
       {pages > 1 && (
-        <nav className="mt-4 flex items-center justify-center gap-2">
+        <nav className="mt-6 flex items-center justify-center gap-2">
           {f.page > 1 && (
-            <Link href={withParams("/jobs", current, { page: String(f.page - 1) })} className={buttonClasses("secondary", "sm")}>
+            <Link href={withParams("/jobs", current, { page: String(f.page - 1) })} className={buttonClasses("secondary", "md")}>
               <ChevronLeft />
               Previous
             </Link>
           )}
-          <span className="px-2 text-xs text-muted tabular-nums">
+          <span className="px-3 text-sm text-muted tabular-nums">
             {f.page} / {pages}
           </span>
           {f.page < pages && (
-            <Link href={withParams("/jobs", current, { page: String(f.page + 1) })} className={buttonClasses("secondary", "sm")}>
+            <Link href={withParams("/jobs", current, { page: String(f.page + 1) })} className={buttonClasses("secondary", "md")}>
               Next
               <ChevronRight />
             </Link>

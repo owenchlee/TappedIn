@@ -65,7 +65,7 @@ export function StatusPill({
 }) {
   const variant = STATUS_VARIANT[value] ?? "muted";
   const classes = clsx(
-    "inline-flex h-6 items-center gap-1.5 rounded-md px-2 text-xs font-medium ring-1 ring-inset",
+    "inline-flex h-7 items-center gap-1.5 rounded-full px-2.5 text-xs font-medium ring-1 ring-inset",
     BADGE_CLASSES[variant],
     className,
   );
