@@ -24,7 +24,7 @@
       "careerUrl": "https://github.com/vanshb03/Summer2027-Internships",
       "adapter": "simplify",
       "enabled": true,
-      "config": { "url": "https://raw.githubusercontent.com/vanshb03/Summer{year}-Internships/dev/.github/scripts/listings.json" },
+      "config": { "url": "https://raw.githubusercontent.com/vanshb03/Summer{year}-Internships/dev/.github/scripts/listings.json", "keepsClosedJobs": true },
       "match": { "regions": ["canada", "remote", "us"] }
     },
     {

@@ -81,8 +81,15 @@ async function main() {
   let dbKeys: Set<string> | null = null;
   if (process.argv.includes("--db")) {
     const { prisma } = await import("../lib/db");
-    const rows = await prisma.coopPosting.findMany({ where: { sourceKey: src.key }, select: { url: true, role: true, status: true } });
-    dbKeys = new Set(rows.filter((r) => r.status !== "closed").map((r) => rowKey(r.url, r.role)));
+    // Visible on the Jobs page = open, and either its own row or merged into an open copy of the
+    // same job from another list (duplicateOf).
+    const rows = await prisma.coopPosting.findMany({
+      where: { sourceKey: src.key },
+      select: { url: true, role: true, status: true, duplicateOf: { select: { status: true, duplicateOfId: true } } },
+    });
+    const visible = (r: (typeof rows)[number]) =>
+      r.duplicateOf ? r.duplicateOf.status !== "closed" && r.duplicateOf.duplicateOfId == null : r.status !== "closed";
+    dbKeys = new Set(rows.filter(visible).map((r) => rowKey(r.url, r.role)));
     await prisma.$disconnect();
   }
 
@@ -104,13 +111,13 @@ async function main() {
     const pct = ((100 * r.kept) / Math.max(1, r.feed - r.outOfRegion)).toFixed(1);
     console.log(
       `\n${cat}: feed ${r.feed} | kept ${r.kept} (${pct}% of in-region) | outside Canada/US/remote ${r.outOfRegion} | missing ${r.missing.length}` +
-        (dbKeys ? ` | kept but not in DB ${r.notInDb.length}` : ""),
+        (dbKeys ? ` | kept but not visible in DB ${r.notInDb.length}` : ""),
     );
     for (const l of r.missing.slice(0, 20)) {
       const p = fetched.get(rowKey(l.url, l.title));
       console.log(`  MISSING ${l.company_name} | ${l.title} | ${(l.locations ?? []).join(" / ")} | region=${p?.region ?? "none"} | ${l.url}`);
     }
-    for (const l of r.notInDb.slice(0, 20)) console.log(`  NOT IN DB ${l.company_name} | ${l.title} | ${l.url}`);
+    for (const l of r.notInDb.slice(0, 20)) console.log(`  NOT VISIBLE ${l.company_name} | ${l.title} | ${l.url}`);
     bad += r.missing.length + r.notInDb.length;
   }
   console.log(`\nTotal ${wanted.length} Summer 2027 SWE/AI-ML/PM rows in the feed; ${bad} missing.`);

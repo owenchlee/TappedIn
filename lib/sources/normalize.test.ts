@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { regionForLocation, regionForLocations, titleKeyFor, urlKeyFor, categoryFromTitle } from "@/lib/sources/normalize";
+import { externalKeyFor, regionForLocation, regionForLocations, titleKeyFor, urlKeyFor, categoryFromTitle } from "@/lib/sources/normalize";
 import { termsFromText, termSortKey, termForDate, nextTerm } from "@/lib/terms";
 
 describe("dedupe keys", () => {
@@ -7,6 +7,16 @@ describe("dedupe keys", () => {
     expect(urlKeyFor("https://www.jobs.lever.co/acme/123/apply?utm_source=simplify")).toBe(
       urlKeyFor("https://jobs.lever.co/acme/123"),
     );
+  });
+
+  it("keeps job-ID query params so distinct jobs on one page stay distinct", () => {
+    expect(urlKeyFor("https://stripe.com/jobs/search?gh_jid=8128745")).not.toBe(urlKeyFor("https://stripe.com/jobs/search?gh_jid=8130805"));
+    expect(urlKeyFor("https://boards.greenhouse.io/embed/job_app?token=1")).not.toBe(urlKeyFor("https://boards.greenhouse.io/embed/job_app?token=2"));
+    expect(externalKeyFor("https://x.taleo.net/jobdetail.ftl?job=1", "Intern")).not.toBe(externalKeyFor("https://x.taleo.net/jobdetail.ftl?job=2", "Intern"));
+    // ...while tracking params and param order still don't matter.
+    expect(urlKeyFor("https://www.stripe.com/jobs/search?gh_jid=1&utm_source=Simplify&ref=Simplify")).toBe(urlKeyFor("https://stripe.com/jobs/search?gh_jid=1"));
+    expect(urlKeyFor("https://a.com/j?job_id=5&gh_jid=5")).toBe(urlKeyFor("https://a.com/j?gh_jid=5&job_id=5"));
+    expect(urlKeyFor("https://www.pinterestcareers.com/jobs/?gh_jid=7838577")).toBe("pinterestcareers.com/jobs?gh_jid=7838577");
   });
 
   it("refuses to key on a bare careers homepage", () => {

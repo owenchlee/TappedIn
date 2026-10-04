@@ -6,6 +6,8 @@ import { applyMatch } from "@/lib/sources/filter";
 import { diffPostings } from "@/lib/sources/diff";
 import { applyDiff, type ExistingPostingMeta } from "@/lib/sources/apply";
 import { enrich } from "@/lib/sources/enrich";
+import { rekeyPostingsIfNeeded } from "@/lib/sources/rekey";
+import { promoteLiveDuplicates } from "@/lib/sources/promote";
 import { importMlhHackathons, type HackathonImportSummary } from "@/lib/hackathons/mlh";
 import { runOrgWatch, type OrgWatchSummary } from "@/lib/watch/orgWatch";
 import type { LoadedSource } from "@/lib/sources/types";
@@ -113,6 +115,8 @@ export async function runDailyRefresh(): Promise<DailyRefreshResult> {
   }
 
   return withRefreshLock(async () => {
+    // Must run before any diff: stale keys would mark every re-keyed posting missed and re-create it.
+    await rekeyPostingsIfNeeded();
     const sources = await listEnabledSources();
     const summaries: SourceRunSummary[] = [];
 
@@ -121,6 +125,9 @@ export async function runDailyRefresh(): Promise<DailyRefreshResult> {
       // Politeness delay between sources — this is a personal, low-volume fetcher, not a scraper farm.
       await new Promise((resolve) => setTimeout(resolve, 500));
     }
+
+    // After every source has run: un-hide jobs still open elsewhere whose canonical row just closed.
+    await promoteLiveDuplicates();
 
     const hackathons = await importMlhHackathons();
     // A watcher failure (e.g. DB hiccup) must not lose the sources/MLH results above.
@@ -155,7 +162,10 @@ export async function runSourceByKey(key: string): Promise<SourceRunSummary> {
   }
 
   return withRefreshLock(async () => {
+    await rekeyPostingsIfNeeded();
     const row = await prisma.companySource.findUniqueOrThrow({ where: { key } });
-    return runOneSource(loadedSourceFromRow(row));
+    const summary = await runOneSource(loadedSourceFromRow(row));
+    await promoteLiveDuplicates();
+    return summary;
   });
 }

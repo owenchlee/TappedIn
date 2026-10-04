@@ -2,13 +2,26 @@ import { createHash } from "node:crypto";
 import { slugify } from "@/lib/format";
 import type { JobCategory, Region } from "@/lib/types";
 
-/** Lowercases the host, drops the hash, and strips all query params (tracking params churn constantly). */
+// Query params that identify WHICH job a URL is: Greenhouse on a company site (?gh_jid=), Greenhouse
+// embeds (?token=), Taleo (?job=), and friends. Everything else (utm_*, ref, source...) is tracking
+// noise that churns constantly. Dropping these merged distinct jobs: all of Stripe's
+// /jobs/search?gh_jid=... internships collapsed into one.
+const JOB_ID_PARAMS = new Set(["gh_jid", "token", "job", "job_id", "jobid", "jid", "jk", "id", "reqid", "req_id", "requisitionid", "pid", "posting_id", "for", "role"]);
+
+/** The job-identifying part of a query string, sorted so param order doesn't matter ("" if none). */
+export function jobIdQuery(url: URL): string {
+  const kept = [...url.searchParams.entries()]
+    .filter(([k, v]) => JOB_ID_PARAMS.has(k.toLowerCase()) && v)
+    .map(([k, v]) => `${k.toLowerCase()}=${v}`)
+    .sort();
+  return kept.length ? `?${kept.join("&")}` : "";
+}
+
+/** Lowercases the host, drops the hash, and strips tracking params, keeping job-ID params. */
 export function normalizeUrl(rawUrl: string): string {
   try {
     const url = new URL(rawUrl);
-    url.hash = "";
-    url.search = "";
-    return `${url.protocol}//${url.hostname.toLowerCase()}${url.pathname.replace(/\/+$/, "")}`;
+    return `${url.protocol}//${url.hostname.toLowerCase()}${url.pathname.replace(/\/+$/, "")}${jobIdQuery(url)}`;
   } catch {
     return rawUrl.trim().toLowerCase();
   }
@@ -33,9 +46,11 @@ export function urlKeyFor(rawUrl: string): string | null {
       .toLowerCase()
       .replace(/\/(apply|application|applications)\/?$/, "")
       .replace(/\/+$/, "");
-    // A bare careers homepage identifies a company, not a job — never dedupe on it.
-    if (path === "" || /^\/(careers?|jobs?)$/.test(path)) return null;
-    return `${host}${path}`;
+    const query = jobIdQuery(url);
+    // A bare careers homepage identifies a company, not a job — never dedupe on it. With a job-ID
+    // param ("/jobs?gh_jid=123") it does identify one job.
+    if (!query && (path === "" || /^\/(careers?|jobs?)$/.test(path))) return null;
+    return `${host}${path}${query}`;
   } catch {
     return null;
   }
