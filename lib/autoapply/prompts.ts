@@ -43,7 +43,11 @@ ${pickBaseStep(opts.forcedBase)}
   for a more relevant one from experience.md; rephrase bullets to use the posting's own vocabulary
   for things Owen actually did; reorder or adjust the Skills line (only skills backed by
   experience.md); bold the key number in a bullet the way the template already does.
-- Do not change facts in Education, Experience, Involvements, or Awards (light rewording is fine).
+- Experience and Involvements: you may replace the least relevant entry with a more relevant one from
+  experience.md's "University involvements" (e.g. a design team for robotics, embedded or autonomy
+  roles), when it helps this job. Use its title, organization and dates exactly, its resume bullets
+  as written there, and the same template commands; keep the same number of entries per section.
+- Otherwise do not change facts in Education, Experience, Involvements, or Awards (light rewording is fine).
 - Keep LaTeX escaping correct (\\%, \\&, \\$, \\#). Never leave a TODO in the output.
 - If the base has "\\% TODO" notes in a bullet, remove the note text (and never carry it over).
 
