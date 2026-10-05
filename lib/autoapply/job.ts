@@ -44,6 +44,13 @@ export type Job = {
   /** Set when Owen says he applied (he applies himself, on the company's site). */
   submittedAt?: string;
   applicationId?: string;
+  /** Set on jobs the nightly batch tailored (scripts/nightly.ts): the night's date, e.g. "2026-10-05". */
+  batch?: string;
+  /** The posting's fit score and deadline when the batch picked it, to order the morning queue. */
+  fitScore?: number | null;
+  deadline?: string | null;
+  /** Owen skipped it in the morning queue. */
+  skippedAt?: string;
   log: { at: string; msg: string }[];
 };
 
@@ -71,7 +78,7 @@ export function newJobId(company: string, role: string, now = new Date()): strin
   return `${stamp}-${slug(`${company}-${role}`) || "job"}`;
 }
 
-export function createJob(input: Pick<Job, "source" | "company" | "role" | "url" | "region">): Job {
+export function createJob(input: Pick<Job, "source" | "company" | "role" | "url" | "region"> & Partial<Pick<Job, "batch" | "fitScore" | "deadline">>): Job {
   const now = new Date();
   const job: Job = {
     id: newJobId(input.company, input.role, now),

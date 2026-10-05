@@ -17,6 +17,8 @@ import { FitScore } from "@/components/jobs/FitSummary";
 import { formatDate } from "@/lib/deadline";
 import { relativeTime } from "@/lib/format";
 import { nextTerm, termForDate, termLabel, termShortLabel } from "@/lib/terms";
+import { listJobs } from "@/lib/autoapply/job";
+import { queueOrder } from "@/lib/autoapply/queue";
 
 export const dynamic = "force-dynamic";
 
@@ -83,6 +85,7 @@ export default async function HomePage() {
   const term = termForDate(now);
   const dateLine = new Intl.DateTimeFormat("en-US", { timeZone: "America/Toronto", weekday: "long", month: "long", day: "numeric" }).format(now);
   const upNext = [...overdue, ...agenda];
+  const applyQueue = process.env.AUTO_APPLY_ENABLED === "1" ? queueOrder(listJobs(), now) : [];
 
   return (
     <div className="mx-auto max-w-3xl space-y-10">
@@ -95,6 +98,18 @@ export default async function HomePage() {
           {process.env.DISPLAY_NAME ? `, ${process.env.DISPLAY_NAME}` : ""}.
         </h1>
       </header>
+
+      {applyQueue.length > 0 && (
+        <Link href="/apply/queue" className="flex items-center gap-4 rounded-2xl bg-accent px-5 py-4 text-accent-fg shadow-card transition-colors hover:bg-accent-hover">
+          <div className="min-w-0 flex-1">
+            <p className="font-semibold">
+              {applyQueue.length} application{applyQueue.length === 1 ? "" : "s"} ready to send
+            </p>
+            <p className="truncate text-sm opacity-80">Resumes tailored overnight. Starts with {applyQueue[0].company}.</p>
+          </div>
+          <ArrowRight className="size-5 shrink-0" />
+        </Link>
+      )}
 
       <div className="grid grid-cols-3 gap-3">
         <StatCard label="In progress" value={stats.active} hint={`${stats.applied30d} applied this month`} href="/applications" />

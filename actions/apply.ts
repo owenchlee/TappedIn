@@ -1,6 +1,7 @@
 "use server";
 
-import { writeFileSync } from "node:fs";
+import { spawn } from "node:child_process";
+import { copyFileSync, existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
@@ -9,6 +10,7 @@ import { createJob, jobDir, readJob, writeJob, type Job } from "@/lib/autoapply/
 import { isResumeBase, type ResumeBase } from "@/lib/autoapply/base";
 import { setStage, trackPosting } from "@/actions/applications";
 import { findOrCreateManualPosting } from "@/lib/postings";
+import { applyFolder } from "@/lib/autoapply/queue";
 import { toggleSave } from "@/actions/saved";
 import type { OrgKind } from "@/lib/types";
 
@@ -131,4 +133,43 @@ export async function markAutoApplySubmitted(jobId: string): Promise<string | nu
   writeJob(job);
   revalidatePath("/", "layout");
   return savedId;
+}
+
+// The morning queue (/apply/queue). Each job's PDFs are copied into one fixed folder, so every
+// upload field's file picker opens on the right files (Windows remembers the last folder per site).
+const APPLY_FOLDER = applyFolder();
+const UPLOAD_NAMES = ["Owen_Lee_Resume.pdf", "Owen_Lee_Cover_Letter.pdf"];
+
+/** Puts this job's resume (and cover letter, if any) in Documents\Apply Today, replacing the last job's. */
+export async function stageApplyFiles(jobId: string): Promise<string[]> {
+  assertEnabled();
+  if (!readJob(jobId)) throw new Error("No such job");
+  mkdirSync(APPLY_FOLDER, { recursive: true });
+  const staged: string[] = [];
+  for (const name of UPLOAD_NAMES) {
+    rmSync(path.join(APPLY_FOLDER, name), { force: true });
+    const src = path.join(jobDir(jobId), "upload", name);
+    if (existsSync(src)) {
+      copyFileSync(src, path.join(APPLY_FOLDER, name));
+      staged.push(name);
+    }
+  }
+  return staged;
+}
+
+/** Opens Documents\Apply Today in File Explorer (to drag the PDFs into an upload box). */
+export async function openApplyFolder(): Promise<void> {
+  assertEnabled();
+  mkdirSync(APPLY_FOLDER, { recursive: true });
+  spawn("explorer.exe", [APPLY_FOLDER], { detached: true, stdio: "ignore" }).unref();
+}
+
+/** Not applying to this one; it leaves the queue and is never picked again. */
+export async function skipQueuedJob(jobId: string): Promise<void> {
+  assertEnabled();
+  const job = readJob(jobId);
+  if (!job) throw new Error("No such job");
+  job.skippedAt = new Date().toISOString();
+  writeJob(job);
+  revalidatePath("/apply/queue");
 }

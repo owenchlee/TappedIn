@@ -5,6 +5,7 @@ import {
   Cpu,
   House,
   KanbanSquare,
+  ListChecks,
   Radar,
   Route,
   Settings,
@@ -39,7 +40,12 @@ export function youItems(opts: { autoApply: boolean }): NavItem[] {
     { href: "/contacts", label: "Contacts", icon: Contact, hint: "Recruiters and referrers" },
     { href: "/journey", label: "Journey", icon: Route, hint: "Your five years, term by term" },
     { href: "/insights", label: "Insights", icon: BarChart3, hint: "How your search is going" },
-    ...(opts.autoApply ? [{ href: "/apply", label: "Resumes", icon: Wand2, hint: "Tailored resumes and cover letters" }] : []),
+    ...(opts.autoApply
+      ? [
+          { href: "/apply/queue", label: "Apply queue", icon: ListChecks, hint: "Tonight's tailored jobs, one at a time" },
+          { href: "/apply", label: "Resumes", icon: Wand2, hint: "Tailored resumes and cover letters" },
+        ]
+      : []),
   ];
 }
 
