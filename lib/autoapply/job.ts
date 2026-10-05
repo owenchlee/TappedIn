@@ -51,6 +51,8 @@ export type Job = {
   deadline?: string | null;
   /** Owen skipped it in the morning queue. */
   skippedAt?: string;
+  /** Added to the queue by hand (e.g. a job he was invited to apply to): goes first. */
+  pinned?: boolean;
   log: { at: string; msg: string }[];
 };
 

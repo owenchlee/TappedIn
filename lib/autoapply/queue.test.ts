@@ -41,6 +41,11 @@ describe("queueOrder", () => {
     ).map((j) => j.id);
     expect(order).toEqual(["closing", "later", "high", "low"]);
   });
+
+  it("puts a pinned job ahead of everything", () => {
+    const order = queueOrder([job("closing", { fitScore: 90, deadline: day(1) }), job("pinned", { pinned: true })], now).map((j) => j.id);
+    expect(order).toEqual(["pinned", "closing"]);
+  });
 });
 
 describe("topUpCount", () => {

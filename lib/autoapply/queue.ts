@@ -15,12 +15,12 @@ export function isQueued(job: Job, now = new Date()): boolean {
   return !job.deadline || Date.parse(job.deadline) > now.getTime() - 12 * HOUR;
 }
 
-/** Closing within three days first (soonest first), then best fit, then oldest batch. */
+/** Pinned first, then closing within three days (soonest first), then best fit, then oldest batch. */
 export function queueOrder(jobs: Job[], now = new Date()): Job[] {
   const soon = (j: Job) => (j.deadline && Date.parse(j.deadline) - now.getTime() < CLOSING_SOON_MS ? Date.parse(j.deadline) : Infinity);
   return jobs
     .filter((j) => isQueued(j, now))
-    .sort((a, b) => soon(a) - soon(b) || (b.fitScore ?? 0) - (a.fitScore ?? 0) || a.createdAt.localeCompare(b.createdAt));
+    .sort((a, b) => Number(Boolean(b.pinned)) - Number(Boolean(a.pinned)) || soon(a) - soon(b) || (b.fitScore ?? 0) - (a.fitScore ?? 0) || a.createdAt.localeCompare(b.createdAt));
 }
 
 /** How many new jobs tonight's batch should tailor so the queue holds `target` again. */
