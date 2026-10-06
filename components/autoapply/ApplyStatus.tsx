@@ -11,6 +11,7 @@ import { SectionTitle } from "@/components/ui/PageHeader";
 import { markAutoApplySubmitted, rebaseAutoApply, requestCoverLetter } from "@/actions/apply";
 import type { Job, StepName, StepState } from "@/lib/autoapply/job";
 import { BASE_BADGE, RESUME_BASES, RESUME_BASE_LABELS } from "@/lib/autoapply/base";
+import { ResumeScoreCard } from "@/components/autoapply/ResumeScore";
 
 const STEP_LABELS: Record<StepName, string> = {
   open: "Read the posting",
@@ -195,6 +196,8 @@ export function ApplyStatus({ initial }: { initial: Job }) {
           </div>
         </section>
       )}
+
+      <ResumeScoreCard ats={job.ats} />
 
       {job.tailorNotes && (
         <section>

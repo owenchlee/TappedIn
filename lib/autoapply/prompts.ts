@@ -11,6 +11,27 @@ experience.md is under "Unconfirmed", do not use it.
 Style: plain, direct, specific. Never use em dashes (the "—" character or LaTeX "---"); use commas,
 periods, or parentheses instead.`;
 
+/**
+ * What ATS keyword search and a recruiter's first pass reward (research notes in lib/autoapply/ats.ts):
+ * literal keyword matches in context, a 7-second F-pattern skim of the top and the left edge, and
+ * action-verb bullets with measured results.
+ */
+const SCAN_RULES = `How the resume gets read, so write for it:
+- ATS keyword search: recruiters search the parsed text for the posting's terms, and some systems
+  match literally. Use the posting's exact spelling for each skill Owen really has ("machine
+  learning" vs "ML", "Node.js" vs "Node", "REST APIs"); when the posting uses an acronym and a
+  spelled-out form, include both once. Show the most important skills inside bullets or project
+  lines where he used them, not only in the Skills list. Never repeat a keyword just to repeat it.
+- Recruiter's first pass (about 7 seconds, F-pattern): the eye reads across the top, then down the
+  left edge. The first entry under Projects or Experience should be the one most relevant to this
+  job. Each bullet opens with a strong past-tense action verb and gets the tech or the result into
+  its first several words. Shape: action verb + what he built + with what + measured result.
+- Keep bullets to one or two full lines (about 15 to 28 words). A bullet whose second line holds
+  only a word or two wastes space: tighten it to one line or fill the second line.
+- Dates: give both ends a year ("June 2025 -- Sep. 2025", not "June -- Sep. 2025").
+- No filler ("responsible for", "worked on", "helped", "various", "passionate", "leveraged"), no "I"
+  or "we".`;
+
 function pickBaseStep(forced?: ResumeBase): string {
   if (forced) return `1) Use ${forced}.tex as the base resume. Owen chose it himself, so do not second-guess it.`;
   return `1) Pick the base resume from what the job mainly is, reading the posting, not just the title:
@@ -50,6 +71,8 @@ ${pickBaseStep(opts.forcedBase)}
 - Otherwise do not change facts in Education, Experience, Involvements, or Awards (light rewording is fine).
 - Keep LaTeX escaping correct (\\%, \\&, \\$, \\#). Never leave a TODO in the output.
 - If the base has "\\% TODO" notes in a bullet, remove the note text (and never carry it over).
+
+${SCAN_RULES}
 
 Also write notes.md. Its first line must be exactly "Base: software", "Base: hardware" or "Base: pm".
 Its second line must be "Why: " followed by one plain sentence on why that base fits this job. Then:
@@ -140,4 +163,59 @@ export function letterFixPrompt(numbers: string[]): string {
   return `cover-letter.txt uses these numbers, which are not in experience.md or the resumes: ${numbers.join(", ")}.
 They were invented. Edit cover-letter.txt in place: use the real figure from experience.md, or
 drop the number and keep the sentence qualitative. Change nothing else. Reply with just DONE.`;
+}
+
+/**
+ * A strict second reader. It sees the compiled PDF the way a recruiter does and writes review.json;
+ * its score is part of the pass/fail gate and its fixes feed the next rewrite.
+ */
+export function reviewPrompt(opts: { company: string; role: string }): string {
+  return `You are a strict technical recruiter screening co-op and intern applicants for: ${opts.role} at ${opts.company}.
+You see hundreds of strong University of Waterloo co-op resumes each term.
+
+Files: resume.pdf (read it as the page a recruiter sees), jd.txt (the posting), experience.md (everything
+true about the candidate; anything under "Unconfirmed" is off limits).
+
+1) First pass, about 7 seconds, F-pattern: read across the top, then down the left edge (entry names,
+   titles, dates, first words of bullets). Note what you took away and whether this job's fit is
+   obvious from that pass alone.
+2) Second pass, 30 seconds: do the bullets show real, measured impact relevant to this posting? Is
+   anything vague, cluttered, padded, repetitive, or keyword-stuffed?
+3) Score 1 to 10 for "would I put this in the interview pile for THIS job":
+   10 = obvious interview; 8 = strong shortlist; 6 = maybe pile; 4 or less = pass.
+   Judge the presentation of what the candidate has, not experience he can't have as a first-year
+   student. Be honest; do not inflate.
+4) List up to 4 fixes that would raise the score, most important first. Every fix must be doable by
+   rewording, reordering, or swapping in content from experience.md, must keep the resume to one
+   page in the same template, and must never invent a skill, number, or project.
+
+Write review.json, exactly this shape and nothing else:
+{"score": 7, "first_impression": "one or two sentences", "fixes": ["...", "..."]}
+
+Reply with just DONE.`;
+}
+
+/** One rewrite round, driven by the scorer's findings and the recruiter review. */
+export function revisePrompt(opts: { company: string; role: string; round: number; scores: string; issues: string[]; reviewFixes: string[]; missing: string[] }): string {
+  const list = (xs: string[]) => xs.map((x) => `- ${x}`).join("\n");
+  return `resume.tex (tailored for ${opts.role} at ${opts.company}) was scored and isn't good enough yet (round ${opts.round}).
+Scores: ${opts.scores}
+
+Problems the checker found:
+${list(opts.issues) || "- none"}
+${opts.reviewFixes.length ? `\nA recruiter reviewing the PDF suggested:\n${list(opts.reviewFixes)}\n` : ""}${opts.missing.length ? `\nPosting keywords that experience.md backs but the resume doesn't show yet (add the important ones where they're true): ${opts.missing.join(", ")}\n` : ""}
+Edit resume.tex in place to fix as many of these as you can. Read jd.txt and experience.md first.
+
+${SCAN_RULES}
+
+Rules that still apply:
+- Everything before \begin{document} stays byte for byte identical; keep the template's commands.
+- It must still fit on ONE page; same number of bullets per entry as now; no new font size commands.
+- You may reorder projects, swap in a more relevant project or involvement from experience.md, reword
+  bullets, and adjust the Skills line, exactly as in the original tailoring rules.
+- If fixing one problem would break a rule above or require inventing something, skip it.
+
+${TRUTH_RULES}
+
+Then append a short "Revision ${opts.round}:" section to notes.md listing what you changed. Reply with just DONE.`;
 }

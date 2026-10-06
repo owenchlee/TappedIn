@@ -21,7 +21,7 @@ import type { NightlyPick } from "../lib/autoapply/nightly";
 const APP_URL = "http://localhost:3000";
 const NIGHTLY_DIR = path.join(PRIVATE_DIR, "nightly");
 const LOCK = path.join(NIGHTLY_DIR, "running.lock");
-// A job takes 2 to 4 minutes; anything near this is stuck.
+// A job takes 2 to 8 minutes (scoring plus up to 1 quality rewrite); anything near this is stuck.
 const JOB_TIMEOUT_MS = 30 * 60_000;
 // Claude Code's plan limit: no point starting more jobs until it resets.
 // e.g. "You've hit your session limit · resets 2am (America/Toronto)".

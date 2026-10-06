@@ -37,6 +37,8 @@ export type Job = {
   /** Set when Owen overrides the pick; the next tailor run must use it. */
   forcedBase?: ResumeBase;
   coverLetter?: { needed: boolean; reason: string; humanized?: boolean };
+  /** The resume quality check (lib/autoapply/ats.ts) on the version that was kept. */
+  ats?: ResumeScore;
   tailorNotes?: string;
   /** Eligibility red flags found in the posting text (e.g. U.S. citizenship required). */
   warnings?: string[];
@@ -54,6 +56,28 @@ export type Job = {
   /** Added to the queue by hand (e.g. a job he was invited to apply to): goes first. */
   pinned?: boolean;
   log: { at: string; msg: string }[];
+};
+
+export type ResumeScore = {
+  overall: number;
+  passed: boolean;
+  /** The first draft's overall score, to show how much the rewrite helped. */
+  firstDraft?: number;
+  /** Rewrites it took (0 = the first draft passed or was the best). */
+  revisions: number;
+  parse: number;
+  keywords: number;
+  /** Match against everything the posting names, including skills Owen doesn't have. */
+  rawMatch: number;
+  scan: number;
+  /** The recruiter review's 1 to 10, or null if it never ran. */
+  review: number | null;
+  firstImpression?: string;
+  shortfalls: string[];
+  /** Fixable problems still on the kept version, plus parse notes. */
+  issues: string[];
+  /** Required or title skills the posting wants that Owen's experience doesn't back. */
+  unattainable: string[];
 };
 
 const ID_RE = /^[a-z0-9-]{8,80}$/;

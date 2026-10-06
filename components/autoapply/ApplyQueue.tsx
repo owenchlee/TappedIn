@@ -11,6 +11,7 @@ import { FitScore } from "@/components/jobs/FitSummary";
 import { markAutoApplySubmitted, openApplyFolder, skipQueuedJob, stageApplyFiles } from "@/actions/apply";
 import { RESUME_BASE_LABELS } from "@/lib/autoapply/base";
 import type { Job } from "@/lib/autoapply/job";
+import { ResumeScoreBadge } from "@/components/autoapply/ResumeScore";
 
 export type NightSummary = {
   batch: string;
@@ -150,6 +151,7 @@ export function ApplyQueue({ initial, appliedToday, night, folder }: { initial: 
               )}
               {hasLetter && <Badge variant="violet">Cover letter</Badge>}
               {job.resumeBase && <Badge variant="muted">{RESUME_BASE_LABELS[job.resumeBase]} resume</Badge>}
+              <ResumeScoreBadge ats={job.ats} />
             </div>
             <h2 className="mt-2 text-2xl font-semibold tracking-tight text-text">{job.company}</h2>
             <p className="text-sm text-muted">{job.role}</p>
@@ -200,6 +202,11 @@ export function ApplyQueue({ initial, appliedToday, night, folder }: { initial: 
                     </li>
                   )}
                 </ul>
+                {opened === job.id && staged.length > 0 && (
+                  <p className="flex items-center gap-1.5 rounded-lg bg-emerald/10 px-3 py-1.5 text-xs text-emerald">
+                    <Check className="size-3.5" /> Apply Today now holds the {job.company} files
+                  </p>
+                )}
               </div>
             </Step>
             <Step n={3} active={opened === job.id}>

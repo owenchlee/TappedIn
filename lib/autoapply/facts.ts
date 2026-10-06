@@ -97,3 +97,8 @@ export function letterNumberProblems(letter: string, sources: { tex: string[]; e
   );
   return [...numbersIn(letter)].filter((n) => !sourceNumbers.has(n) && !/^20\d\d$/.test(n));
 }
+
+/** Everything Owen can truthfully claim, as text: the base resumes' bodies plus confirmed experience.md. */
+export function resumeSourceText(sources: { tex: string[]; experienceMd: string }): string {
+  return [...sources.tex.map((t) => texToText(t.slice(Math.max(0, t.indexOf(BEGIN_DOC))))), confirmedExperience(sources.experienceMd)].join("\n");
+}

@@ -16,10 +16,11 @@
 import { copyFileSync, existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { PRIVATE_DIR, createJob, jobDir, readJob, writeJob, type Job, type StepName, type StepState } from "../lib/autoapply/job";
-import { bodyProblems, compileTex, enforcePreamble, fontsFromLog } from "../lib/autoapply/latex";
-import { factProblems, letterNumberProblems } from "../lib/autoapply/facts";
+import { bodyProblems, compileTex, enforcePreamble, fontsFromLog, pdfToText } from "../lib/autoapply/latex";
+import { factProblems, letterNumberProblems, resumeSourceText } from "../lib/autoapply/facts";
 import { runClaude, usedHumanizer } from "../lib/autoapply/claude";
-import { coverLetterPrompt, letterFixPrompt, fixPrompt, humanizeRetryPrompt, problemsPrompt, tailorPrompt, trimPrompt } from "../lib/autoapply/prompts";
+import { coverLetterPrompt, letterFixPrompt, fixPrompt, humanizeRetryPrompt, problemsPrompt, reviewPrompt, revisePrompt, tailorPrompt, trimPrompt } from "../lib/autoapply/prompts";
+import { TARGETS, scoreResume, verdict, type AtsReport, type ResumeVerdict } from "../lib/autoapply/ats";
 import { coverLetterTex } from "../lib/autoapply/coverLetterTex";
 import { eligibilityWarnings } from "../lib/autoapply/eligibility";
 import { RESUME_BASES, RESUME_BASE_LABELS, baseFromTitle, parseBaseLine, parseWhyLine } from "../lib/autoapply/base";
@@ -102,6 +103,29 @@ async function tailorResume() {
   const baseFonts = baseCompile.ok ? fontsFromLog(dir, `${job.resumeBase}.tex`) : null;
   if (!baseFonts) log("Couldn't compile the base resume for the font check; skipping it");
 
+  const ctx = { baseTex, factSources, baseFonts };
+  await passHardChecks(ctx);
+  await reviseUntilGood(ctx);
+
+  job.tailorNotes = read("notes.md").replace(/^Base:.*\n?/im, "").replace(/^Why:.*\n?/im, "").trim();
+  mkdirSync(path.join(dir, "upload"), { recursive: true });
+  copyFileSync(path.join(dir, "resume.pdf"), path.join(dir, "upload", RESUME_FILE));
+  const a = job.ats!;
+  step(
+    "tailor",
+    "done",
+    `One page, based on your ${RESUME_BASE_LABELS[job.resumeBase].toLowerCase()} resume. Score ${a.overall}/100` +
+      (a.passed ? "" : a.revisions ? ` (up from ${a.firstDraft} on the first draft)` : " (the rewrite didn't beat the first draft)"),
+  );
+}
+
+type CheckCtx = { baseTex: string; factSources: { tex: string[]; experienceMd: string }; baseFonts: Set<string> | null };
+
+/**
+ * The hard rules: compiles, one page, untouched preamble, no em dashes/TODOs, every fact backed, no
+ * new font sizes. Asks Claude to fix until resume.tex passes; throws after 4 tries.
+ */
+async function passHardChecks({ baseTex, factSources, baseFonts }: CheckCtx) {
   for (let attempt = 0; attempt < 4; attempt++) {
     const { tex, restored } = enforcePreamble(baseTex, read("resume.tex"));
     if (restored) {
@@ -124,17 +148,122 @@ async function tailorResume() {
       if (problems.length) followUp = problemsPrompt(problems);
     }
 
-    if (!followUp) {
-      mkdirSync(path.join(dir, "upload"), { recursive: true });
-      copyFileSync(path.join(dir, "resume.pdf"), path.join(dir, "upload", RESUME_FILE));
-      step("tailor", "done", `One page, based on your ${RESUME_BASE_LABELS[job.resumeBase].toLowerCase()} resume`);
-      return;
-    }
+    if (!followUp) return;
     log(`resume check failed (${!compiled.ok ? "compile error" : compiled.pages! > 1 ? `${compiled.pages} pages` : problems.join(", ")}); asking Claude to fix`);
     const fix = await runClaude({ cwd: dir, prompt: followUp, allowedTools: ["Read", "Edit", "Write"] });
     if (!fix.ok) throw new Error(`Resume fix-up failed: ${fix.error}`);
   }
   throw new Error("Resume still failed checks after 4 attempts; see the log");
+}
+
+const MAX_REVISIONS = Number(process.env.RESUME_MAX_REVISIONS ?? 1);
+// The review is a judgment call, not a rewrite, so a smaller model does it by default to spare usage.
+const REVIEW_MODEL = process.env.RESUME_REVIEW_MODEL ?? "sonnet";
+
+type Scored = { report: AtsReport; review: { score: number; first_impression?: string; fixes: string[] } | null; verdict: ResumeVerdict };
+
+/** Scores the current resume.pdf; the recruiter review only runs once the deterministic checks pass. */
+async function scoreCurrent(sourceText: string): Promise<Scored> {
+  const pdf = path.join(dir, "resume.pdf");
+  const report = scoreResume({
+    tex: read("resume.tex"),
+    pdfText: await pdfToText(pdf),
+    layoutText: await pdfToText(pdf, { layout: true }),
+    jd: read("jd.txt"),
+    role: job.role,
+    sourceText,
+  });
+  let review: Scored["review"] = null;
+  const pre = verdict(report, TARGETS.review); // as if the review passed: is it worth asking?
+  if (pre.passed || pre.shortfalls.every((s) => s.startsWith("overall"))) {
+    rmSync(path.join(dir, "review.json"), { force: true });
+    const run = await runClaude({ cwd: dir, prompt: reviewPrompt(job), allowedTools: ["Read", "Write"], model: REVIEW_MODEL });
+    try {
+      const parsed = JSON.parse(read("review.json"));
+      const score = Math.max(1, Math.min(10, Math.round(Number(parsed.score))));
+      if (Number.isFinite(score)) review = { score, first_impression: String(parsed.first_impression ?? ""), fixes: (parsed.fixes ?? []).map(String).slice(0, 4) };
+    } catch {
+      log(`recruiter review didn't produce review.json (${run.ok ? "bad JSON" : run.error})`);
+    }
+  }
+  return { report, review, verdict: verdict(report, review?.score ?? null) };
+}
+
+const describe = (s: Scored) =>
+  `overall ${s.verdict.overall}: keywords ${s.report.keywords}, recruiter scan ${s.report.scan}, parsing ${s.report.parse}, review ${s.review ? `${s.review.score}/10` : "not run"}`;
+
+/**
+ * The quality loop: score the resume as an ATS and a recruiter would read it, and have Claude rewrite
+ * it from the findings until it passes or MAX_REVISIONS run out. Every rewrite must pass the hard
+ * checks again; the best-scoring version is the one kept.
+ */
+async function reviseUntilGood(ctx: CheckCtx) {
+  const sourceText = resumeSourceText(ctx.factSources);
+  const keep = () => {
+    copyFileSync(path.join(dir, "resume.tex"), path.join(dir, "resume.best.tex"));
+    copyFileSync(path.join(dir, "resume.pdf"), path.join(dir, "resume.best.pdf"));
+  };
+  step("tailor", "running", "Scoring the resume like an ATS and a recruiter would");
+  let current = await scoreCurrent(sourceText);
+  const firstDraft = current.verdict.overall;
+  let best = current;
+  let bestRound = 0;
+  keep();
+  log(`resume score: ${describe(current)}${current.verdict.passed ? " (passes)" : `; short on ${current.verdict.shortfalls.join(", ")}`}`);
+
+  for (let round = 1; round <= MAX_REVISIONS && !best.verdict.passed; round++) {
+    step("tailor", "running", `Score ${best.verdict.overall}/100, not there yet; rewrite ${round} of up to ${MAX_REVISIONS}`);
+    const run = await runClaude({
+      cwd: dir,
+      allowedTools: ["Read", "Edit", "Write"],
+      prompt: revisePrompt({
+        company: job.company,
+        role: job.role,
+        round,
+        scores: describe(current),
+        issues: current.report.issues.filter((i) => i.fixable).map((i) => i.msg),
+        reviewFixes: current.review?.fixes ?? [],
+        missing: current.report.missing.slice(0, 10),
+      }),
+    });
+    log(`rewrite ${round}: ${run.ok ? "ok" : "failed"}, $${run.costUsd.toFixed(2)}`);
+    if (!run.ok) break;
+    try {
+      await passHardChecks(ctx);
+    } catch (err) {
+      log(`rewrite ${round} couldn't pass the hard checks (${err instanceof Error ? err.message : err}); keeping the best earlier version`);
+      break;
+    }
+    current = await scoreCurrent(sourceText);
+    log(`resume score after rewrite ${round}: ${describe(current)}${current.verdict.passed ? " (passes)" : ""}`);
+    // A reviewed version beats an unreviewed one at the same score: it cleared the deterministic bar.
+    if (current.verdict.overall > best.verdict.overall || (current.verdict.passed && !best.verdict.passed)) {
+      best = current;
+      bestRound = round;
+      keep();
+    }
+  }
+
+  // Always put the best version back: the last rewrite may have scored lower or failed the hard checks.
+  copyFileSync(path.join(dir, "resume.best.tex"), path.join(dir, "resume.tex"));
+  copyFileSync(path.join(dir, "resume.best.pdf"), path.join(dir, "resume.pdf"));
+  if (best !== current) log(`kept the version from ${bestRound === 0 ? "the first draft" : `rewrite ${bestRound}`} (${describe(best)})`);
+  job.ats = {
+    overall: best.verdict.overall,
+    passed: best.verdict.passed,
+    firstDraft,
+    revisions: bestRound,
+    parse: best.report.parse,
+    keywords: best.report.keywords,
+    rawMatch: best.report.rawMatch,
+    scan: best.report.scan,
+    review: best.review?.score ?? null,
+    firstImpression: best.review?.first_impression || undefined,
+    shortfalls: best.verdict.shortfalls,
+    issues: best.report.issues.map((i) => i.msg),
+    unattainable: best.report.unattainable,
+  };
+  writeJob(job);
 }
 
 const JD_REQUIRES_COVER =

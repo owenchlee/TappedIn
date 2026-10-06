@@ -95,3 +95,20 @@ export function fontsFromLog(dir: string, texFile: string): Set<string> {
   const text = readFileSync(log, "utf8").replace(/\r?\n/g, "");
   return new Set([...text.matchAll(/([A-Za-z0-9-]+)\.pfb/g)].map((m) => m[1]));
 }
+
+/** pdftotext ships next to pdflatex in MiKTeX (and TeX Live); it reads the PDF roughly the way an ATS parser does. */
+function pdftotextPath(): string {
+  const exe = path.join(path.dirname(pdflatexPath()), process.platform === "win32" ? "pdftotext.exe" : "pdftotext");
+  return existsSync(exe) ? exe : "pdftotext";
+}
+
+/** The PDF's text: reading order by default, or `layout` to keep line wraps and indents. */
+export function pdfToText(pdfFile: string, opts: { layout?: boolean } = {}): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const args = [...(opts.layout ? ["-layout"] : []), "-enc", "UTF-8", pdfFile, "-"];
+    execFile(pdftotextPath(), args, { timeout: 60_000, windowsHide: true, maxBuffer: 10 * 1024 * 1024 }, (err, stdout) => {
+      if (err) reject(new Error(`pdftotext failed: ${err.message}`));
+      else resolve(stdout);
+    });
+  });
+}

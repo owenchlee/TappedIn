@@ -1,7 +1,7 @@
 "use server";
 
 import { spawn } from "node:child_process";
-import { copyFileSync, existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
@@ -140,11 +140,18 @@ export async function markAutoApplySubmitted(jobId: string): Promise<string | nu
 const APPLY_FOLDER = applyFolder();
 const UPLOAD_NAMES = ["Owen_Lee_Resume.pdf", "Owen_Lee_Cover_Letter.pdf"];
 
-/** Puts this job's resume (and cover letter, if any) in Documents\Apply Today, replacing the last job's. */
+/**
+ * Puts this job's resume (and cover letter, if any) in Documents\Apply Today, replacing the last job's,
+ * plus an empty "FOR <company> - <role>.txt" so the folder shows at a glance whose files these are.
+ */
 export async function stageApplyFiles(jobId: string): Promise<string[]> {
   assertEnabled();
-  if (!readJob(jobId)) throw new Error("No such job");
+  const job = readJob(jobId);
+  if (!job) throw new Error("No such job");
   mkdirSync(APPLY_FOLDER, { recursive: true });
+  for (const f of readdirSync(APPLY_FOLDER)) if (f.startsWith("FOR ") && f.endsWith(".txt")) rmSync(path.join(APPLY_FOLDER, f), { force: true });
+  const label = `${job.company} - ${job.role}`.replace(/[<>:"/\\|?*\x00-\x1f]/g, "").replace(/\s+/g, " ").trim().slice(0, 120);
+  writeFileSync(path.join(APPLY_FOLDER, `FOR ${label}.txt`), "");
   const staged: string[] = [];
   for (const name of UPLOAD_NAMES) {
     rmSync(path.join(APPLY_FOLDER, name), { force: true });
