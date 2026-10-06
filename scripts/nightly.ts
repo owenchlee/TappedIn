@@ -1,13 +1,14 @@
 /**
  * The nightly batch: `npm run nightly`. Windows Task Scheduler runs it at 2 AM
  * (scripts/install-nightly.ps1). It makes sure the database and app are up, refreshes the job lists,
- * picks the best jobs Owen can apply to and hasn't touched (topping the morning queue back up to
- * 15), and tailors a resume (plus a cover letter when the posting asks) for each, one at a time.
+ * picks up to 15 recent jobs a first-year in Canada can realistically get and hasn't touched (every
+ * night; unapplied ones leave the queue after 3 days), and tailors a resume (plus a cover letter when the posting asks) for each, one at a time.
  * Nothing is ever submitted: Owen works through the queue at /apply/queue in the morning.
  *
  *   npm run nightly                      # the real run
- *   npm run nightly -- --count 5         # queue target other than 15 (or NIGHTLY_COUNT in .env)
+ *   npm run nightly -- --count 5         # jobs per night other than 15 (or NIGHTLY_COUNT in .env)
  *   npm run nightly -- --min-score 60    # lowest fit score to pick (default 50, or NIGHTLY_MIN_SCORE)
+ *   npm run nightly -- --max-age 7       # only jobs posted in the last 7 days (default 14, or NIGHTLY_MAX_AGE_DAYS)
  *   npm run nightly -- --dry-run         # only print what it would pick
  *   npm run nightly -- --no-refresh      # skip refreshing the job lists first
  */
@@ -35,6 +36,7 @@ const option = (name: string) => {
 };
 const target = Number(option("count") ?? process.env.NIGHTLY_COUNT ?? 15);
 const minScore = Number(option("min-score") ?? process.env.NIGHTLY_MIN_SCORE ?? 50);
+const maxAgeDays = Number(option("max-age") ?? process.env.NIGHTLY_MAX_AGE_DAYS ?? 14);
 const dryRun = flag("dry-run");
 
 /** Toronto's date, so a 2 AM run belongs to the morning it's for. */
@@ -102,8 +104,8 @@ async function main() {
       }
     }
 
-    const { queued, picks } = await api<{ queued: number; picks: NightlyPick[] }>(`/api/cron/nightly?target=${target}&minScore=${minScore}`);
-    say(`${queued} still waiting in the queue; tailoring ${picks.length} more (target ${target}, min score ${minScore})`);
+    const { queued, picks } = await api<{ queued: number; picks: NightlyPick[] }>(`/api/cron/nightly?target=${target}&minScore=${minScore}&maxAgeDays=${maxAgeDays}`);
+    say(`${queued} still waiting in the queue; tailoring ${picks.length} new (up to ${target}, min score ${minScore}, posted in the last ${maxAgeDays} days)`);
     for (const p of picks) say(`  ${p.fitScore ?? "?"}  ${p.company} · ${p.role}${p.deadline ? ` (closes ${p.deadline.slice(0, 10)})` : ""}`);
     if (dryRun) return;
 

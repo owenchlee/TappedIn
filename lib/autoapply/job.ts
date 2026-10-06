@@ -55,6 +55,8 @@ export type Job = {
   skippedAt?: string;
   /** Added to the queue by hand (e.g. a job he was invited to apply to): goes first. */
   pinned?: boolean;
+  /** Stays in the queue past the usual few days, until applied to or skipped. */
+  keep?: boolean;
   log: { at: string; msg: string }[];
 };
 

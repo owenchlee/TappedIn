@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Job } from "./job";
-import { isQueued, queueOrder, spreadPicks, topUpCount } from "./queue";
+import { isQueued, mentionsCanada, queueOrder, realismScore, spreadPicks, unrealisticTitle } from "./queue";
 
 const now = new Date("2026-10-05T12:00:00Z");
 const day = (n: number) => new Date(now.getTime() + n * 86_400_000).toISOString();
@@ -31,6 +31,12 @@ describe("isQueued", () => {
     expect(isQueued(job("e", { status: "failed" }), now)).toBe(false);
     expect(isQueued(job("f", { deadline: day(-2) }), now)).toBe(false);
   });
+
+  it("drops a batch after three days unless it's pinned", () => {
+    expect(isQueued(job("yesterday", { batch: "2026-10-04" }), now)).toBe(true);
+    expect(isQueued(job("old", { batch: "2026-10-02" }), now)).toBe(false);
+    expect(isQueued(job("old-pinned", { batch: "2026-10-02", pinned: true }), now)).toBe(true);
+  });
 });
 
 describe("queueOrder", () => {
@@ -42,16 +48,36 @@ describe("queueOrder", () => {
     expect(order).toEqual(["closing", "later", "high", "low"]);
   });
 
+  it("puts the newest batch ahead of a better fit from an older one", () => {
+    const order = queueOrder([job("older", { batch: "2026-10-04", fitScore: 95 }), job("newer", { fitScore: 60 })], now).map((j) => j.id);
+    expect(order).toEqual(["newer", "older"]);
+  });
+
   it("puts a pinned job ahead of everything", () => {
     const order = queueOrder([job("closing", { fitScore: 90, deadline: day(1) }), job("pinned", { pinned: true })], now).map((j) => j.id);
     expect(order).toEqual(["pinned", "closing"]);
   });
 });
 
-describe("topUpCount", () => {
-  it("tops the queue back up to the target", () => {
-    expect(topUpCount([job("a"), job("b"), job("c", { submittedAt: day(0) })], 15, now)).toBe(13);
-    expect(topUpCount(Array.from({ length: 20 }, (_, i) => job(`j${i}`)), 15, now)).toBe(0);
+describe("picking rules", () => {
+  it("skips roles a first-year won't realistically get", () => {
+    expect(unrealisticTitle("Senior Software Engineer Intern")).toBe(true);
+    expect(unrealisticTitle("Student Researcher Intern")).toBe(true);
+    expect(unrealisticTitle("PhD Researcher Intern - Machine Learning")).toBe(true);
+    expect(unrealisticTitle("Software Engineering Co-op")).toBe(false);
+    expect(unrealisticTitle("Android Applications Developer Intern")).toBe(false);
+  });
+
+  it("only counts a remote job when the posting mentions Canada", () => {
+    expect(mentionsCanada("Remote within the US or Canada")).toBe(true);
+    expect(mentionsCanada("Open to students in Ontario")).toBe(true);
+    expect(mentionsCanada("Remote, United States only")).toBe(false);
+  });
+
+  it("ranks an early-student-friendly, fresh posting above a slightly better fit", () => {
+    const base = { fitReasons: [] as string[], postedAt: null, firstSeenAt: new Date(now.getTime() - 20 * 86_400_000) };
+    const fresh = { fitScore: 70, fitReasons: ["+Open to 1st/2nd years"], postedAt: null, firstSeenAt: new Date(now.getTime() - 86_400_000) };
+    expect(realismScore(fresh, now)).toBeGreaterThan(realismScore({ ...base, fitScore: 85 }, now));
   });
 });
 

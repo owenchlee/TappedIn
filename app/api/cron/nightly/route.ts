@@ -18,7 +18,8 @@ export async function GET(req: Request) {
   const params = new URL(req.url).searchParams;
   const target = Math.min(50, Math.max(1, Number(params.get("target")) || 15));
   const minScore = Number(params.get("minScore") ?? 50) || 0;
-  return Response.json(await pickNightly({ target, minScore }));
+  const maxAgeDays = Math.max(1, Number(params.get("maxAgeDays")) || 14);
+  return Response.json(await pickNightly({ target, minScore, maxAgeDays }));
 }
 
 export async function POST(req: Request) {
