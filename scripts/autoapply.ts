@@ -13,7 +13,7 @@
  *
  * Lives outside Next's bundle on purpose: the `claude` CLI and pdfLaTeX only exist locally.
  */
-import { copyFileSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { PRIVATE_DIR, createJob, jobDir, readJob, writeJob, type Job, type StepName, type StepState } from "../lib/autoapply/job";
 import { bodyProblems, compileTex, enforcePreamble, fontsFromLog } from "../lib/autoapply/latex";
@@ -215,13 +215,17 @@ async function main() {
     await tailorResume();
     if (job.coverLetter?.needed) await writeCoverLetter(); // the letter complements the resume, so redo it too
   } else {
-    rmSync(path.join(dir, "upload"), { recursive: true, force: true });
+    // A redo keeps the last good documents aside until the new ones are made (restored on failure,
+    // e.g. when Claude's usage limit runs out mid-batch).
+    rmSync(path.join(dir, "upload.prev"), { recursive: true, force: true });
+    if (has("upload")) renameSync(path.join(dir, "upload"), path.join(dir, "upload.prev"));
     await readPosting();
     await tailorResume();
     job.coverLetter = decideCoverLetter(read("jd.txt"), false);
     if (job.coverLetter.needed) await writeCoverLetter();
     else step("cover_letter", "skipped", job.coverLetter.reason);
   }
+  rmSync(path.join(dir, "upload.prev"), { recursive: true, force: true });
   job.status = "ready";
   log("Ready. Nothing was sent anywhere.");
 }
@@ -234,6 +238,13 @@ main()
       job.status = "failed";
       job.error = err instanceof Error ? err.message : String(err);
       for (const name of Object.keys(job.steps) as StepName[]) if (job.steps[name]?.state === "running") job.steps[name].state = "failed";
+      // A failed redo puts the last good documents back, so the job stays usable.
+      if (mode === "full" && has(`upload.prev/${RESUME_FILE}`)) {
+        rmSync(path.join(dir, "upload"), { recursive: true, force: true });
+        renameSync(path.join(dir, "upload.prev"), path.join(dir, "upload"));
+        job.status = "ready";
+        job.log.push({ at: new Date().toISOString(), msg: "Redo failed; kept the previous documents" });
+      }
       // A failed cover letter or redo still leaves the earlier resume usable.
       if (mode !== "full" && has(`upload/${RESUME_FILE}`)) job.status = "ready";
       writeJob(job);
