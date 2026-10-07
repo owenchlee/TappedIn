@@ -65,8 +65,15 @@ export function ApplyQueue({ initial, appliedToday, night, folder }: { initial: 
     // Synchronously, inside the click, or the popup blocker eats it.
     window.open(job.url, "_blank", "noopener");
     setOpened(job.id);
-    run(async () => setStaged(await stageApplyFiles(job.id)));
-  }, [job, run]);
+  }, [job]);
+
+  // Whoever is at the front owns Apply Today, so the folder never shows a previous job's files.
+  const jobId = job?.id;
+  useEffect(() => {
+    if (!jobId) return;
+    setStaged([]);
+    run(async () => setStaged(await stageApplyFiles(jobId)));
+  }, [jobId, run]);
 
   const applied = useCallback(() => {
     if (!job) return;
@@ -202,7 +209,7 @@ export function ApplyQueue({ initial, appliedToday, night, folder }: { initial: 
                     </li>
                   )}
                 </ul>
-                {opened === job.id && staged.length > 0 && (
+                {staged.length > 0 && (
                   <p className="flex items-center gap-1.5 rounded-lg bg-emerald/10 px-3 py-1.5 text-xs text-emerald">
                     <Check className="size-3.5" /> Apply Today now holds the {job.company} files
                   </p>

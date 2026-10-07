@@ -42,7 +42,7 @@ export default function ApplyQueuePage() {
     <div className="mx-auto max-w-3xl">
       <PageHeader
         title="Apply queue"
-        description="Tailored overnight, best first. For each job: open it, let Simplify fill the form, attach the files from Documents\Apply Today, submit, then hit I applied."
+        description="Tailored overnight; each night's jobs join the end. For each job: open it, let Simplify fill the form, attach the files from Documents\Apply Today, submit, then hit I applied."
       />
       <ApplyQueue initial={queue} appliedToday={appliedToday} night={lastNight()} folder={applyFolder()} />
     </div>

@@ -10,7 +10,7 @@ import { createJob, jobDir, readJob, writeJob, type Job } from "@/lib/autoapply/
 import { isResumeBase, type ResumeBase } from "@/lib/autoapply/base";
 import { setStage, trackPosting } from "@/actions/applications";
 import { findOrCreateManualPosting } from "@/lib/postings";
-import { applyFolder } from "@/lib/autoapply/queue";
+import { applyFolder, labelPdf } from "@/lib/autoapply/queue";
 import { toggleSave } from "@/actions/saved";
 import type { OrgKind } from "@/lib/types";
 
@@ -142,16 +142,16 @@ const UPLOAD_NAMES = ["Owen_Lee_Resume.pdf", "Owen_Lee_Cover_Letter.pdf"];
 
 /**
  * Puts this job's resume (and cover letter, if any) in Documents\Apply Today, replacing the last job's,
- * plus an empty "FOR <company> - <role>.txt" so the folder shows at a glance whose files these are.
+ * plus a "FOR <company> - <role>.pdf" label so the folder (and a PDF-only file picker) shows whose files these are.
  */
 export async function stageApplyFiles(jobId: string): Promise<string[]> {
   assertEnabled();
   const job = readJob(jobId);
   if (!job) throw new Error("No such job");
   mkdirSync(APPLY_FOLDER, { recursive: true });
-  for (const f of readdirSync(APPLY_FOLDER)) if (f.startsWith("FOR ") && f.endsWith(".txt")) rmSync(path.join(APPLY_FOLDER, f), { force: true });
+  for (const f of readdirSync(APPLY_FOLDER)) if (f.startsWith("FOR ") && /\.(txt|pdf)$/.test(f)) rmSync(path.join(APPLY_FOLDER, f), { force: true });
   const label = `${job.company} - ${job.role}`.replace(/[<>:"/\\|?*\x00-\x1f]/g, "").replace(/\s+/g, " ").trim().slice(0, 120);
-  writeFileSync(path.join(APPLY_FOLDER, `FOR ${label}.txt`), "");
+  writeFileSync(path.join(APPLY_FOLDER, `FOR ${label}.pdf`), labelPdf([`FOR ${job.company} - ${job.role}`, "Label only. Don't upload this file; upload the Owen_Lee_ files."]));
   const staged: string[] = [];
   for (const name of UPLOAD_NAMES) {
     rmSync(path.join(APPLY_FOLDER, name), { force: true });

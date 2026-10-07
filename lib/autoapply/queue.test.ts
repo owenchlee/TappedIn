@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { Job } from "./job";
-import { isQueued, mentionsCanada, queueOrder, realismScore, spreadPicks, unrealisticTitle } from "./queue";
+import { inTargetTerm, isQueued, labelPdf, mentionsCanada, queueOrder, realismScore, spreadPicks, unrealisticTitle } from "./queue";
+import { termsInText } from "@/lib/fit/requirements";
 
 const now = new Date("2026-10-05T12:00:00Z");
 const day = (n: number) => new Date(now.getTime() + n * 86_400_000).toISOString();
@@ -48,9 +49,9 @@ describe("queueOrder", () => {
     expect(order).toEqual(["closing", "later", "high", "low"]);
   });
 
-  it("puts the newest batch ahead of a better fit from an older one", () => {
-    const order = queueOrder([job("older", { batch: "2026-10-04", fitScore: 95 }), job("newer", { fitScore: 60 })], now).map((j) => j.id);
-    expect(order).toEqual(["newer", "older"]);
+  it("adds each night's batch to the end, even a closing-soon or better-fit job", () => {
+    const order = queueOrder([job("newer", { fitScore: 95, deadline: day(1) }), job("older", { batch: "2026-10-04", fitScore: 60 })], now).map((j) => j.id);
+    expect(order).toEqual(["older", "newer"]);
   });
 
   it("puts a pinned job ahead of everything", () => {
@@ -94,5 +95,40 @@ describe("spreadPicks", () => {
       { company: "AMD", role: "Hardware Intern" },
     ];
     expect(spreadPicks(rows, 5).map((r) => r.role)).toEqual(["Software Engineer Intern/Co-op", "Hardware Intern"]);
+  });
+});
+
+describe("inTargetTerm", () => {
+  const s27 = ["S27"];
+  it("takes postings for the target term, or that never say their term (most are summer)", () => {
+    expect(inTargetTerm(["S27"], "Software Intern", s27)).toBe(true);
+    expect(inTargetTerm(["W27"], "Data Analyst Co-op", s27)).toBe(false);
+    expect(inTargetTerm([], "Software Engineer Co-op", s27)).toBe(true);
+    expect(inTargetTerm([], "Software Engineer Co-op", s27, ["W27"])).toBe(false);
+    expect(inTargetTerm(["S27", "W27", "F27"], "Software Development Engineer Intern", s27)).toBe(true);
+  });
+
+  it("rejects a multi-term placement that starts before the target term", () => {
+    expect(inTargetTerm(["W27", "S27"], "NPI Hardware Co-op - 8 month", s27)).toBe(false);
+    expect(inTargetTerm(["S27", "F27"], "Firmware Co-op (8 months)", s27)).toBe(true);
+  });
+});
+
+describe("inTargetTerm with the posting's own text", () => {
+  it("trusts the posting over a list's term tag", () => {
+    expect(inTargetTerm(["S27"], "Electronics Design Co-op", ["S27"], termsInText("Electronics Design Co-op (Jan 2027)"))).toBe(false);
+    expect(inTargetTerm(["S27"], "Systems Engineer Co-op", ["S27"], termsInText("Must be able to complete a 16 month Co-Op term starting May 2026"))).toBe(false);
+    expect(inTargetTerm(["S27"], "Silicon Intern", ["S27"], termsInText("For 16-month internships: must be available May/June 2027 - August/September 2028"))).toBe(true);
+  });
+});
+
+describe("labelPdf", () => {
+  it("builds a PDF whose xref points at each object", () => {
+    const pdf = labelPdf(["FOR Qualcomm - Silicon (Validation) Intern", "Label only."]).toString("latin1");
+    expect(pdf.startsWith("%PDF-1.4")).toBe(true);
+    expect(pdf).toContain("(FOR Qualcomm - Silicon \\(Validation\\) Intern) Tj");
+    const offsets = [...pdf.matchAll(/^(\d{10}) 00000 n $/gm)].map((m) => Number(m[1]));
+    offsets.forEach((o, i) => expect(pdf.slice(o).startsWith(`${i + 1} 0 obj`)).toBe(true));
+    expect(pdf.slice(Number(pdf.match(/startxref\n(\d+)/)![1])).startsWith("xref")).toBe(true);
   });
 });
