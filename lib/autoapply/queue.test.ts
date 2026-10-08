@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Job } from "./job";
-import { inTargetTerm, isQueued, labelPdf, mentionsCanada, queueOrder, realismScore, spreadPicks, unrealisticTitle } from "./queue";
+import { bigCompany, inTargetTerm, isQueued, labelPdf, mentionsCanada, queueOrder, realismScore, spreadPicks, unrealisticTitle } from "./queue";
 import { termsInText } from "@/lib/fit/requirements";
 
 const now = new Date("2026-10-05T12:00:00Z");
@@ -80,6 +80,16 @@ describe("picking rules", () => {
     const fresh = { fitScore: 70, fitReasons: ["+Open to 1st/2nd years"], postedAt: null, firstSeenAt: new Date(now.getTime() - 86_400_000) };
     expect(realismScore(fresh, now)).toBeGreaterThan(realismScore({ ...base, fitScore: 85 }, now));
   });
+
+  it("knows household-name companies without catching lookalikes", () => {
+    for (const c of ["Amazon", "AMD", "Qualcomm", "xAI", "Royal Bank of Canada", "TD Bank", "Electronic Arts", "Meta"]) expect(bigCompany(c)).toBe(true);
+    for (const c of ["Solink", "Blue Robotics", "Metalab", "Intelliware", "Foresters Financial", "TRC Companies"]) expect(bigCompany(c)).toBe(false);
+  });
+
+  it("ranks a smaller company above a household name with a better fit", () => {
+    const row = { fitReasons: [] as string[], postedAt: null, firstSeenAt: new Date(now.getTime() - 20 * 86_400_000) };
+    expect(realismScore({ ...row, company: "Solink", fitScore: 72 }, now)).toBeGreaterThan(realismScore({ ...row, company: "Amazon", fitScore: 90 }, now));
+  });
 });
 
 describe("spreadPicks", () => {
@@ -95,6 +105,11 @@ describe("spreadPicks", () => {
       { company: "AMD", role: "Hardware Intern" },
     ];
     expect(spreadPicks(rows, 5).map((r) => r.role)).toEqual(["Software Engineer Intern/Co-op", "Hardware Intern"]);
+  });
+
+  it("caps household-name companies when asked", () => {
+    const rows = ["Amazon", "Qualcomm", "Solink", "AMD", "Blue Robotics"].map((company, i) => ({ company, role: `Role ${i}` }));
+    expect(spreadPicks(rows, 5, 2, 2).map((r) => r.company)).toEqual(["Amazon", "Qualcomm", "Solink", "Blue Robotics"]);
   });
 });
 

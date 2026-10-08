@@ -71,11 +71,37 @@ export function mentionsCanada(text: string): boolean {
   return /\bcanad(a|ian)\b|\b(ontario|toronto|waterloo|vancouver|montr[eé]al|ottawa|calgary|british columbia|qu[eé]bec)\b/i.test(text);
 }
 
+// Household-name employers whose internships draw thousands of applicants each: big tech, big chips,
+// hot AI startups, top quant firms and the big Canadian banks. A first-year's odds there are tiny,
+// so the nightly batch ranks them last and takes only a few a night (Owen's call, 2026-10-08).
+const BIG_NAMES = [
+  "amazon", "aws", "google", "alphabet", "deepmind", "meta", "apple", "microsoft", "netflix", "nvidia", "amd",
+  "intel", "qualcomm", "tesla", "spacex", "xai", "openai", "anthropic", "figma", "stripe", "databricks",
+  "bytedance", "tiktok", "uber", "airbnb", "salesforce", "adobe", "autodesk", "atlassian", "shopify", "ibm",
+  "oracle", "cisco", "intuit", "electronic arts", "linkedin", "snowflake", "palantir", "jane street",
+  "citadel", "two sigma", "hudson river trading", "jump trading", "optiver", "royal bank of canada", "rbc",
+  "td", "bmo", "scotiabank", "cibc", "marvell", "cadence", "synopsys", "broadcom", "samsung", "harvey",
+  "superhuman", "robinhood", "coinbase", "pinterest", "snap", "doordash", "lyft", "wealthsimple", "ramp",
+  "notion", "scale ai", "perplexity", "cohere", "bloomberg", "goldman sachs", "morgan stanley", "jpmorgan",
+  "waymo", "capital one", "affirm", "expedia", "dropbox", "reddit", "spotify", "datadog", "cloudflare",
+  "roblox", "discord", "duolingo", "paypal", "ebay", "palo alto networks", "servicenow", "workday",
+];
+const BIG_RE = new RegExp(`^(${BIG_NAMES.map((n) => n.replace(/ /g, "\\s+")).join("|")})\\b`, "i");
+
+/** A household-name company whose internships are swamped with applicants. */
+export function bigCompany(company: string): boolean {
+  return BIG_RE.test(company.trim());
+}
+
 /**
  * How good a nightly pick is for Owen: the fit score, plus extra weight on what makes a job
- * realistic for a first-year (open to early students, co-op) and on how recently it was posted.
+ * realistic for a first-year (open to early students, co-op, not a household name) and on how
+ * recently it was posted.
  */
-export function realismScore(r: { fitScore: number | null; fitReasons: string[]; postedAt: Date | null; firstSeenAt: Date }, now = new Date()): number {
+export function realismScore(
+  r: { company?: string; fitScore: number | null; fitReasons: string[]; postedAt: Date | null; firstSeenAt: Date },
+  now = new Date(),
+): number {
   const posted = r.postedAt && r.postedAt < r.firstSeenAt ? r.postedAt : r.firstSeenAt;
   const age = (now.getTime() - posted.getTime()) / DAY;
   let s = r.fitScore ?? 0;
@@ -83,24 +109,31 @@ export function realismScore(r: { fitScore: number | null; fitReasons: string[];
   if (r.fitReasons.includes("+Co-op friendly")) s += 8;
   if (age <= 2) s += 12;
   else if (age <= 7) s += 6;
+  if (r.company && bigCompany(r.company)) s -= 25;
   return s;
 }
 
 /**
- * Pick in order until `count` are chosen: at most `perCompany` from one company, and one of each
- * title (the same role posted for several cities is one application's worth of tailoring).
+ * Pick in order until `count` are chosen: at most `perCompany` from one company, at most `maxBig`
+ * from household-name companies, and one of each title (the same role posted for several cities is
+ * one application's worth of tailoring).
  */
-export function spreadPicks<T extends { company: string; role: string }>(rows: T[], count: number, perCompany = 2): T[] {
+export function spreadPicks<T extends { company: string; role: string }>(rows: T[], count: number, perCompany = 2, maxBig = Infinity): T[] {
   const norm = (s: string) => s.trim().toLowerCase().replace(/\s+/g, " ");
   const perCo = new Map<string, number>();
   const titles = new Set<string>();
   const out: T[] = [];
+  let big = 0;
   for (const r of rows) {
     if (out.length >= count) break;
     const co = norm(r.company);
     const title = `${co}|${norm(r.role)}`;
     const n = perCo.get(co) ?? 0;
     if (n >= perCompany || titles.has(title)) continue;
+    if (bigCompany(r.company)) {
+      if (big >= maxBig) continue;
+      big++;
+    }
     perCo.set(co, n + 1);
     titles.add(title);
     out.push(r);

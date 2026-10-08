@@ -20,6 +20,9 @@ const DAY = 24 * HOUR;
 // Posting text (checked for the term, and for Canada on remote jobs) is read a few rows at a time because
 // the local database falls over on big text scans.
 const TEXT_BATCH = 20;
+// Household-name companies (bigCompany) per night: they already rank last, and this keeps a thin
+// night from filling up with them anyway. Owen would rather apply where his odds are real.
+const MAX_BIG = 3;
 
 export async function pickNightly(opts: { target: number; minScore: number; maxAgeDays: number }): Promise<{ queued: number; picks: NightlyPick[] }> {
   const jobs = listJobs();
@@ -66,7 +69,7 @@ export async function pickNightly(opts: { target: number; minScore: number; maxA
   // Walk the ranking, reading each posting's text: its own term has to agree, a U.S. job needs a visa
   // sponsor, and a remote job counts once the text mentions Canada (or it's a U.S. one with a sponsor).
   const eligible: typeof ranked = [];
-  for (let i = 0; i < ranked.length && spreadPicks(eligible, opts.target).length < opts.target; i += TEXT_BATCH) {
+  for (let i = 0; i < ranked.length && spreadPicks(eligible, opts.target, 2, MAX_BIG).length < opts.target; i += TEXT_BATCH) {
     const slice = ranked.slice(i, i + TEXT_BATCH);
     const texts = new Map(
       (await prisma.coopPosting.findMany({ where: { id: { in: slice.map((r) => r.id) } }, select: { id: true, details: true } })).map((t) => [t.id, t.details ?? ""]),
@@ -79,7 +82,7 @@ export async function pickNightly(opts: { target: number; minScore: number; maxA
     }
   }
 
-  const picks = spreadPicks(eligible, opts.target).map((r) => ({
+  const picks = spreadPicks(eligible, opts.target, 2, MAX_BIG).map((r) => ({
     postingId: r.id,
     company: r.company,
     role: r.role,
