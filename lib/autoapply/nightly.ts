@@ -22,7 +22,7 @@ const DAY = 24 * HOUR;
 const TEXT_BATCH = 20;
 // Household-name companies (bigCompany) per night: they already rank last, and this keeps a thin
 // night from filling up with them anyway. Owen would rather apply where his odds are real.
-const MAX_BIG = 3;
+const MAX_BIG = 1;
 
 export async function pickNightly(opts: { target: number; minScore: number; maxAgeDays: number }): Promise<{ queued: number; picks: NightlyPick[] }> {
   const jobs = listJobs();

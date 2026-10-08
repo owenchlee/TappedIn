@@ -73,7 +73,7 @@ export function mentionsCanada(text: string): boolean {
 
 // Household-name employers whose internships draw thousands of applicants each: big tech, big chips,
 // hot AI startups, top quant firms and the big Canadian banks. A first-year's odds there are tiny,
-// so the nightly batch ranks them last and takes only a few a night (Owen's call, 2026-10-08).
+// so the nightly batch ranks them last and takes at most one a night (Owen's call, 2026-10-08).
 const BIG_NAMES = [
   "amazon", "aws", "google", "alphabet", "deepmind", "meta", "apple", "microsoft", "netflix", "nvidia", "amd",
   "intel", "qualcomm", "tesla", "spacex", "xai", "openai", "anthropic", "figma", "stripe", "databricks",
