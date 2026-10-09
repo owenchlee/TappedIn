@@ -18,6 +18,7 @@ import { existsSync, mkdirSync, rmSync, statSync, writeFileSync } from "node:fs"
 import path from "node:path";
 import { PRIVATE_DIR, readJob, writeJob } from "../lib/autoapply/job";
 import type { NightlyPick } from "../lib/autoapply/nightly";
+import { budgetStop, retryAt } from "../lib/autoapply/usage";
 
 const APP_URL = "http://localhost:3000";
 const NIGHTLY_DIR = path.join(PRIVATE_DIR, "nightly");
@@ -80,9 +81,15 @@ function writeReport(results: Result[], queued: number, notes: string[]) {
 
 async function main() {
   mkdirSync(NIGHTLY_DIR, { recursive: true });
-  if (existsSync(LOCK) && Date.now() - statSync(LOCK).mtimeMs < 4 * 3_600_000) {
-    say("Another nightly run is still going; exiting.");
-    return;
+  // Another run (e.g. a one-off list) refreshes the lock every job: wait for it, then pick tonight's jobs.
+  while (existsSync(LOCK) && Date.now() - statSync(LOCK).mtimeMs < 4 * 3_600_000) {
+    const stop = budgetStop();
+    if (stop) {
+      say(`Another nightly run is still going and ${stop}; exiting.`);
+      return;
+    }
+    say("Another nightly run is still going; checking again in 5 minutes.");
+    await new Promise((res) => setTimeout(res, 5 * 60_000));
   }
   writeFileSync(LOCK, String(process.pid));
   const notes: string[] = [];
@@ -110,7 +117,15 @@ async function main() {
     if (dryRun) return;
 
     const results: Result[] = picks.map((p) => ({ ...p, status: "not started" }));
-    for (const r of results) {
+    for (let i = 0; i < results.length; i++) {
+      const r = results[i];
+      const stop = budgetStop();
+      if (stop) {
+        notes.push(`Stopped early: ${stop}. The rest will be picked tomorrow night.`);
+        say(notes.at(-1)!);
+        break;
+      }
+      writeFileSync(LOCK, String(process.pid));
       const started = Date.now();
       try {
         r.jobId = (await api<{ jobId: string }>("/api/cron/nightly", { method: "POST", body: JSON.stringify({ postingId: r.postingId, batch }) })).jobId;
@@ -137,6 +152,18 @@ async function main() {
         // Nothing was made, and a kept failed run would stop this job from ever being picked again.
         rmSync(path.join(PRIVATE_DIR, "applications", r.jobId), { recursive: true, force: true });
         r.status = "not started";
+        // A 5-hour limit that resets before noon: wait it out and try this job again.
+        const at = /weekly/i.test(r.note ?? "") ? null : retryAt();
+        if (at) {
+          say(`Claude's limit hit; waiting until ${new Date(at).toLocaleTimeString("en-CA", { timeZone: "America/Toronto" })} to try again.`);
+          while (Date.now() < at) {
+            writeFileSync(LOCK, String(process.pid));
+            await new Promise((res) => setTimeout(res, Math.min(5 * 60_000, at - Date.now())));
+          }
+          Object.assign(r, { jobId: undefined, note: undefined, minutes: undefined });
+          i--; // try this job again
+          continue;
+        }
         notes.push("Stopped early: Claude's usage limit was hit. The rest will be picked tomorrow night.");
         say(notes.at(-1)!);
         break;

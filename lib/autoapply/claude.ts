@@ -1,4 +1,5 @@
 import { spawn } from "node:child_process";
+import { recordUsage } from "./usage";
 
 // Runs Claude Code headless (`claude -p`) on Owen's own plan. Chosen over the raw API so the real
 // /humanizer skill runs on cover letters instead of a paraphrase of its rules. The prompt goes in
@@ -50,13 +51,16 @@ export function runClaude(opts: {
         const line = buf.slice(0, nl).trim();
         buf = buf.slice(nl + 1);
         if (!line) continue;
-        let evt: { type?: string; message?: { content?: unknown }; result?: string; total_cost_usd?: number; is_error?: boolean };
+        let evt: { type?: string; message?: { content?: unknown }; result?: string; total_cost_usd?: number; is_error?: boolean; rate_limit_info?: Parameters<typeof recordUsage>[0] };
         try {
           evt = JSON.parse(line);
         } catch {
           continue;
         }
-        if (evt.type === "assistant" && Array.isArray(evt.message?.content)) {
+        if (evt.type === "rate_limit_event" && evt.rate_limit_info) {
+          // How much of the plan is used, so the nightly runs can leave Owen his share.
+          recordUsage(evt.rate_limit_info);
+        } else if (evt.type === "assistant" && Array.isArray(evt.message?.content)) {
           for (const part of evt.message.content as { type: string; name?: string; input?: Record<string, unknown> }[]) {
             if (part.type === "tool_use" && part.name) toolUses.push({ name: part.name, input: part.input ?? {} });
           }
