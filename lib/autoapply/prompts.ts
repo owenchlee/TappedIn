@@ -64,6 +64,9 @@ ${pickBaseStep(opts.forcedBase)}
   for a more relevant one from experience.md; rephrase bullets to use the posting's own vocabulary
   for things Owen actually did; reorder or adjust the Skills line (only skills backed by
   experience.md); bold the key number in a bullet the way the template already does.
+- Skills line and each project's tech list: spell every item exactly as it appears in a base resume
+  or experience.md ("Claude API", not "LLMs (Claude API)"); no added parentheses, descriptions, or
+  soft skills like "cross-functional coordination". A checker rejects anything else.
 - Experience and Involvements: you may replace the least relevant entry with a more relevant one from
   experience.md's "University involvements" (e.g. a design team for robotics, embedded or autonomy
   roles), when it helps this job. Use its title, organization and dates exactly, its resume bullets

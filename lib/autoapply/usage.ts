@@ -54,8 +54,21 @@ function nextNoon(now: Date): number {
 
 const clock = (sec: number) => new Date(sec * 1000).toLocaleTimeString("en-CA", { timeZone: "America/Toronto", hour: "numeric", minute: "2-digit" });
 
+/** A one-off "no new jobs after this" time (ISO) in private/nightly/stop-by.txt, e.g. so Owen's 5-hour
+ *  window is fresh by a set hour the next morning. Ignored once it's more than a day old. */
+function stopBy(now: Date): number | null {
+  try {
+    const t = Date.parse(readFileSync(path.join(PRIVATE_DIR, "nightly", "stop-by.txt"), "utf8").trim());
+    return Number.isFinite(t) && now.getTime() - t < 86_400_000 ? t : null;
+  } catch {
+    return null;
+  }
+}
+
 /** Why the overnight run should stop before starting another job, or null to keep going. */
 export function budgetStop(now = new Date()): string | null {
+  const cutoff = stopBy(now);
+  if (cutoff != null && now.getTime() >= cutoff) return `it's past ${clock(cutoff / 1000)}, the stop time you set so Claude is fresh in the morning`;
   const h = torontoHour(now);
   if (h >= NOON && h < 20) return "it's past noon, so the rest of the day's Claude use is yours";
   const five = readUsage()?.fiveHour;
@@ -69,5 +82,6 @@ export function budgetStop(now = new Date()): string | null {
 export function retryAt(now = new Date()): number | null {
   const five = readUsage()?.fiveHour;
   const at = five && five.resetsAt * 1000 > now.getTime() ? five.resetsAt * 1000 + 60_000 : now.getTime() + 30 * 60_000;
-  return at < nextNoon(now) ? at : null;
+  const cutoff = stopBy(now);
+  return at < nextNoon(now) && (cutoff == null || at < cutoff) ? at : null;
 }

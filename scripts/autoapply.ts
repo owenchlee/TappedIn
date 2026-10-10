@@ -150,15 +150,20 @@ async function passHardChecks({ baseTex, factSources, baseFonts }: CheckCtx) {
 
     if (!followUp) return;
     log(`resume check failed (${!compiled.ok ? "compile error" : compiled.pages! > 1 ? `${compiled.pages} pages` : problems.join(", ")}); asking Claude to fix`);
-    const fix = await runClaude({ cwd: dir, prompt: followUp, allowedTools: ["Read", "Edit", "Write"] });
+    const fix = await runClaude({ cwd: dir, prompt: followUp, allowedTools: ["Read", "Edit", "Write"], model: FIX_MODEL });
     if (!fix.ok) throw new Error(`Resume fix-up failed: ${fix.error}`);
   }
   throw new Error("Resume still failed checks after 4 attempts; see the log");
 }
 
 const MAX_REVISIONS = Number(process.env.RESUME_MAX_REVISIONS ?? 1);
+// A first draft scoring this or better skips the rewrite: on Oct 9-10 drafts at 85+ gained only 1-3
+// points from it, while the rewrite (plus its re-check and re-review) cost about as much as the draft.
+const REWRITE_BELOW = Number(process.env.RESUME_REWRITE_BELOW ?? 85);
 // The review is a judgment call, not a rewrite, so a smaller model does it by default to spare usage.
 const REVIEW_MODEL = process.env.RESUME_REVIEW_MODEL ?? "sonnet";
+// Fix-ups (compile errors, page overflow, unbacked skills) are small mechanical edits: same idea.
+const FIX_MODEL = process.env.RESUME_FIX_MODEL ?? "sonnet";
 
 type Scored = { report: AtsReport; review: { score: number; first_impression?: string; fixes: string[] } | null; verdict: ResumeVerdict };
 
@@ -211,7 +216,8 @@ async function reviseUntilGood(ctx: CheckCtx) {
   keep();
   log(`resume score: ${describe(current)}${current.verdict.passed ? " (passes)" : `; short on ${current.verdict.shortfalls.join(", ")}`}`);
 
-  for (let round = 1; round <= MAX_REVISIONS && !best.verdict.passed; round++) {
+  if (!best.verdict.passed && firstDraft >= REWRITE_BELOW) log(`first draft scored ${firstDraft}, at or above ${REWRITE_BELOW}, so no rewrite`);
+  for (let round = 1; round <= MAX_REVISIONS && !best.verdict.passed && best.verdict.overall < REWRITE_BELOW; round++) {
     step("tailor", "running", `Score ${best.verdict.overall}/100, not there yet; rewrite ${round} of up to ${MAX_REVISIONS}`);
     const run = await runClaude({
       cwd: dir,
@@ -295,7 +301,7 @@ async function writeCoverLetter() {
   let invented = letterNumberProblems(read("cover-letter.txt"), sources);
   if (invented.length) {
     log(`cover letter uses unbacked numbers (${invented.join(", ")}); asking Claude to fix`);
-    await runClaude({ cwd: dir, prompt: letterFixPrompt(invented), allowedTools: ["Read", "Edit", "Write"] });
+    await runClaude({ cwd: dir, prompt: letterFixPrompt(invented), allowedTools: ["Read", "Edit", "Write"], model: FIX_MODEL });
     invented = letterNumberProblems(read("cover-letter.txt"), sources);
   }
 
