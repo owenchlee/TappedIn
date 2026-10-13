@@ -1,12 +1,12 @@
 /**
  * The nightly batch: `npm run nightly`. Windows Task Scheduler runs it at 2 AM
  * (scripts/install-nightly.ps1). It makes sure the database and app are up, refreshes the job lists,
- * picks up to 15 recent jobs a first-year in Canada can realistically get and hasn't touched (every
+ * picks up to 10 recent jobs a first-year in Canada can realistically get and hasn't touched (every
  * night; unapplied ones leave the queue after 3 days), and tailors a resume (plus a cover letter when the posting asks) for each, one at a time.
  * Nothing is ever submitted: Owen works through the queue at /apply/queue in the morning.
  *
  *   npm run nightly                      # the real run
- *   npm run nightly -- --count 5         # jobs per night other than 15 (or NIGHTLY_COUNT in .env)
+ *   npm run nightly -- --count 5         # jobs per night other than 10 (or NIGHTLY_COUNT in .env)
  *   npm run nightly -- --min-score 60    # lowest fit score to pick (default 50, or NIGHTLY_MIN_SCORE)
  *   npm run nightly -- --max-age 7       # only jobs posted in the last 7 days (default 14, or NIGHTLY_MAX_AGE_DAYS)
  *   npm run nightly -- --dry-run         # only print what it would pick
@@ -18,7 +18,7 @@ import { existsSync, mkdirSync, rmSync, statSync, writeFileSync } from "node:fs"
 import path from "node:path";
 import { PRIVATE_DIR, readJob, writeJob } from "../lib/autoapply/job";
 import type { NightlyPick } from "../lib/autoapply/nightly";
-import { budgetStop, retryAt } from "../lib/autoapply/usage";
+import { budgetStop, retryAt, weeklyUsedSince } from "../lib/autoapply/usage";
 
 const APP_URL = "http://localhost:3000";
 const NIGHTLY_DIR = path.join(PRIVATE_DIR, "nightly");
@@ -35,7 +35,7 @@ const option = (name: string) => {
   const i = argv.indexOf(`--${name}`);
   return i >= 0 ? argv[i + 1] : undefined;
 };
-const target = Number(option("count") ?? process.env.NIGHTLY_COUNT ?? 15);
+const target = Number(option("count") ?? process.env.NIGHTLY_COUNT ?? 10);
 const minScore = Number(option("min-score") ?? process.env.NIGHTLY_MIN_SCORE ?? 50);
 const maxAgeDays = Number(option("max-age") ?? process.env.NIGHTLY_MAX_AGE_DAYS ?? 14);
 const dryRun = flag("dry-run");
@@ -72,11 +72,18 @@ function runTailor(jobId: string): Promise<void> {
 
 type Result = NightlyPick & { jobId?: string; status: "ready" | "failed" | "not started"; note?: string; coverLetter?: boolean; minutes?: number };
 
+const runStart = Date.now();
+
 function writeReport(results: Result[], queued: number, notes: string[]) {
   mkdirSync(NIGHTLY_DIR, { recursive: true });
   const ready = results.filter((r) => r.status === "ready").length;
-  writeFileSync(path.join(NIGHTLY_DIR, `${batch}.json`), JSON.stringify({ batch, finishedAt: new Date().toISOString(), target, minScore, queuedBefore: queued, ready, results, notes }, null, 2));
+  const weekly = weeklyUsedSince(runStart);
+  writeFileSync(path.join(NIGHTLY_DIR, `${batch}.json`), JSON.stringify({ batch, finishedAt: new Date().toISOString(), target, minScore, queuedBefore: queued, ready, weekly, results, notes }, null, 2));
   say(`Done: ${ready} of ${results.length} tailored; queue had ${queued} waiting before tonight.`);
+  if (weekly)
+    say(weekly.reset
+      ? `Weekly limit: reset during the run; ${weekly.after}% used since the reset.`
+      : `Weekly limit: ${weekly.before}% → ${weekly.after}%, so tonight used ${weekly.used}%.`);
 }
 
 async function main() {

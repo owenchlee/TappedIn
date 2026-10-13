@@ -16,7 +16,7 @@ export async function GET(req: Request) {
   const no = denied(req);
   if (no) return no;
   const params = new URL(req.url).searchParams;
-  const target = Math.min(50, Math.max(1, Number(params.get("target")) || 15));
+  const target = Math.min(50, Math.max(1, Number(params.get("target")) || 10));
   const minScore = Number(params.get("minScore") ?? 50) || 0;
   const maxAgeDays = Math.max(1, Number(params.get("maxAgeDays")) || 14);
   return Response.json(await pickNightly({ target, minScore, maxAgeDays }));

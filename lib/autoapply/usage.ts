@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { PRIVATE_DIR } from "./job";
 
@@ -10,6 +10,8 @@ import { PRIVATE_DIR } from "./job";
 //   - On a limit hit, wait for the reset only if it comes before noon.
 
 const USAGE_FILE = path.join(PRIVATE_DIR, "nightly", "usage.json");
+// Every reading, one JSON per line, so a run can tell how much of the weekly limit it used.
+const USAGE_LOG = path.join(PRIVATE_DIR, "nightly", "usage-log.jsonl");
 export const NOON = 12;
 const KEEP_FOR_OWEN = 0.25;
 
@@ -27,8 +29,32 @@ export function recordUsage(info: RateLimitInfo) {
     const sevenDay = win(info.unifiedWindows?.seven_day);
     if (!fiveHour && !sevenDay) return;
     mkdirSync(path.dirname(USAGE_FILE), { recursive: true });
-    writeFileSync(USAGE_FILE, JSON.stringify({ at: new Date().toISOString(), fiveHour, sevenDay } satisfies Usage, null, 2));
+    const usage: Usage = { at: new Date().toISOString(), fiveHour, sevenDay };
+    writeFileSync(USAGE_FILE, JSON.stringify(usage, null, 2));
+    appendFileSync(USAGE_LOG, JSON.stringify(usage) + "\n");
   } catch {}
+}
+
+/** Weekly-limit % at the first and last readings since `since` (epoch ms), or null with no readings.
+ *  The first reading comes with the run's first Claude call, so "before" includes a sliver of that call. */
+export function weeklyUsedSince(since: number): { before: number; after: number; used: number; reset: boolean } | null {
+  try {
+    const week = readFileSync(USAGE_LOG, "utf8")
+      .split("\n")
+      .filter(Boolean)
+      .map((line) => JSON.parse(line) as Usage)
+      .filter((u) => Date.parse(u.at) >= since && u.sevenDay)
+      .map((u) => u.sevenDay!);
+    if (!week.length) return null;
+    const pct = (n: number) => Math.round(n * 100);
+    const [first, last] = [week[0], week.at(-1)!];
+    // The weekly window reset mid-run: only what was used after the reset is countable.
+    const reset = last.resetsAt !== first.resetsAt;
+    const before = reset ? 0 : pct(first.utilization);
+    return { before, after: pct(last.utilization), used: pct(last.utilization) - before, reset };
+  } catch {
+    return null;
+  }
 }
 
 export function readUsage(): Usage | null {
