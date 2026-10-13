@@ -10,7 +10,8 @@ import { SectionTitle } from "@/components/ui/PageHeader";
 import { FitScore } from "@/components/jobs/FitSummary";
 import { markAutoApplySubmitted, openApplyFolder, skipQueuedJob, stageApplyFiles } from "@/actions/apply";
 import { RESUME_BASE_LABELS } from "@/lib/autoapply/base";
-import type { Job } from "@/lib/autoapply/job";
+import type { RankedJob } from "@/lib/autoapply/rankedQueue";
+import type { Roi } from "@/lib/autoapply/roi";
 import { ResumeScoreBadge } from "@/components/autoapply/ResumeScore";
 
 export type NightSummary = {
@@ -31,7 +32,7 @@ function closes(deadline: string | null | undefined): { label: string; urgent: b
 }
 
 /** One job at a time: open it, attach the staged files, submit, "I applied", next. Keys: O, A, S, C. */
-export function ApplyQueue({ initial, appliedToday, night, folder }: { initial: Job[]; appliedToday: number; night: NightSummary | null; folder: string }) {
+export function ApplyQueue({ initial, appliedToday, night, folder }: { initial: RankedJob[]; appliedToday: number; night: NightSummary | null; folder: string }) {
   const [queue, setQueue] = useState(initial);
   const [done, setDone] = useState(appliedToday);
   const [opened, setOpened] = useState<string | null>(null);
@@ -150,6 +151,7 @@ export function ApplyQueue({ initial, appliedToday, night, folder }: { initial: 
         <Card className="space-y-5 p-5 sm:p-6">
           <div>
             <div className="flex flex-wrap items-center gap-2">
+              <RoiBadge roi={job.roi} />
               {job.fitScore != null && <FitScore score={job.fitScore} reasons={[]} />}
               {due && (
                 <Badge variant={due.urgent ? "urgent" : "muted"}>
@@ -162,6 +164,7 @@ export function ApplyQueue({ initial, appliedToday, night, folder }: { initial: 
             </div>
             <h2 className="mt-2 text-2xl font-semibold tracking-tight text-text">{job.company}</h2>
             <p className="text-sm text-muted">{job.role}</p>
+            <RoiParts roi={job.roi} />
           </div>
 
           {job.warnings?.map((w) => (
@@ -239,7 +242,7 @@ export function ApplyQueue({ initial, appliedToday, night, folder }: { initial: 
               const d = closes(j.deadline);
               return (
                 <div key={j.id} className="flex items-center gap-3 px-4 py-2.5">
-                  {j.fitScore != null && <FitScore score={j.fitScore} reasons={[]} />}
+                  <RoiBadge roi={j.roi} />
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-medium text-text">{j.company}</p>
                     <p className="truncate text-xs text-muted">{j.role}</p>
@@ -288,5 +291,38 @@ function NightLine({ night }: { night: NightSummary }) {
         </p>
       ))}
     </div>
+  );
+}
+
+function roiTier(score: number): { label: string; className: string } {
+  if (score >= 70) return { label: "High ROI", className: "bg-emerald/12 text-emerald ring-emerald/25" };
+  if (score >= 50) return { label: "Decent ROI", className: "bg-accent/12 text-accent ring-accent/25" };
+  if (score >= 30) return { label: "Low ROI", className: "bg-surface-2 text-muted ring-border" };
+  return { label: "Long shot", className: "bg-overdue/10 text-overdue ring-overdue/20" };
+}
+
+/** The odds this application turns into an interview, 0-100 (lib/autoapply/roi.ts). */
+function RoiBadge({ roi }: { roi: Roi }) {
+  const tier = roiTier(roi.score);
+  return (
+    <span
+      title={`${tier.label} (${roi.score}/100)\n${roi.parts.map((p) => (p.max ? `${p.label}: ${Math.round(p.points)}/${p.max}` : `${p.label}: x0.4`)).join("\n")}`}
+      className={`inline-flex h-5 shrink-0 items-center gap-1 rounded-full px-1.5 text-[11px] font-semibold tabular-nums ring-1 ring-inset ${tier.className}`}
+    >
+      <span className="font-medium opacity-70">ROI</span>
+      {roi.score}
+    </span>
+  );
+}
+
+function RoiParts({ roi }: { roi: Roi }) {
+  return (
+    <ul className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted" aria-label="Why this ROI">
+      {roi.parts.map((p) => (
+        <li key={p.label} className={p.max && p.points / p.max < 0.35 ? "text-overdue" : undefined}>
+          {p.label} <span className="tabular-nums opacity-70">{p.max ? `${Math.round(p.points)}/${p.max}` : "x0.4"}</span>
+        </li>
+      ))}
+    </ul>
   );
 }

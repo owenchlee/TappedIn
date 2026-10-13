@@ -11,37 +11,29 @@ const HOUR = 3_600_000;
 const DAY = 24 * HOUR;
 /** Within a night's batch, jobs closing within this window go first. */
 export const CLOSING_SOON_MS = 72 * HOUR;
-/** A night's batch stays in the queue this many days (today's, yesterday's, the day before's). */
-export const QUEUE_DAYS = 3;
-
-/** Midnight in Toronto at the start of a batch date ("2026-10-05"). */
-function batchStart(batch: string): number {
-  return Date.parse(`${batch}T00:00:00-04:00`);
-}
-
 /**
- * Tailored by a nightly batch in the last few days (or pinned), documents ready, not yet applied to
- * or skipped, deadline not passed. Older ones drop off so the queue stays fresh; they stay in Resumes.
+ * Tailored by a nightly batch, documents ready, not yet applied to or skipped, deadline not passed.
+ * Jobs wait however many nights it takes; only a passed deadline drops one (Owen's call, 2026-10-13).
  */
 export function isQueued(job: Job, now = new Date()): boolean {
   if (!job.batch || job.submittedAt || job.skippedAt || job.status !== "ready") return false;
-  if (!job.pinned && !job.keep && now.getTime() - batchStart(job.batch) >= QUEUE_DAYS * DAY) return false;
   return !job.deadline || Date.parse(job.deadline) > now.getTime() - 12 * HOUR;
 }
 
 /**
- * Pinned first, then batch by batch, oldest first: each night's jobs join the end, so the job at the
- * front never changes under you. Within a batch: closing within three days (soonest first), then best fit.
+ * Pinned first, then closing within three days (soonest first, since it's now or never), then the
+ * best return on the application (lib/autoapply/roi.ts) across every night's batch. ROI falls as a
+ * posting ages, so tonight's fresh jobs land ahead of ones that have been waiting.
  */
-export function queueOrder(jobs: Job[], now = new Date()): Job[] {
+export function queueOrder(jobs: Job[], now = new Date(), roi: (j: Job) => number = (j) => j.fitScore ?? 0): Job[] {
   const soon = (j: Job) => (j.deadline && Date.parse(j.deadline) - now.getTime() < CLOSING_SOON_MS ? Date.parse(j.deadline) : Infinity);
   return jobs
     .filter((j) => isQueued(j, now))
     .sort(
       (a, b) =>
         Number(Boolean(b.pinned)) - Number(Boolean(a.pinned)) ||
-        (a.batch ?? "").localeCompare(b.batch ?? "") ||
         soon(a) - soon(b) ||
+        roi(b) - roi(a) ||
         (b.fitScore ?? 0) - (a.fitScore ?? 0) ||
         a.createdAt.localeCompare(b.createdAt),
     );

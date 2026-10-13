@@ -3,7 +3,8 @@ import { existsSync, readFileSync, readdirSync } from "node:fs";
 import path from "node:path";
 import { notFound } from "next/navigation";
 import { PRIVATE_DIR, listJobs } from "@/lib/autoapply/job";
-import { applyFolder, queueOrder } from "@/lib/autoapply/queue";
+import { applyFolder } from "@/lib/autoapply/queue";
+import { rankedQueue } from "@/lib/autoapply/rankedQueue";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { ApplyQueue, type NightSummary } from "@/components/autoapply/ApplyQueue";
 
@@ -31,10 +32,10 @@ function lastNight(): NightSummary | null {
   }
 }
 
-export default function ApplyQueuePage() {
+export default async function ApplyQueuePage() {
   if (process.env.AUTO_APPLY_ENABLED !== "1") notFound();
   const jobs = listJobs();
-  const queue = queueOrder(jobs);
+  const queue = await rankedQueue(jobs);
   const today = new Date().toDateString();
   const appliedToday = jobs.filter((j) => j.batch && j.submittedAt && new Date(j.submittedAt).toDateString() === today).length;
 
@@ -42,7 +43,7 @@ export default function ApplyQueuePage() {
     <div className="mx-auto max-w-3xl">
       <PageHeader
         title="Apply queue"
-        description="Tailored overnight; each night's jobs join the end. For each job: open it, let Simplify fill the form, attach the files from Documents\Apply Today, submit, then hit I applied."
+        description="Tailored overnight, best odds first (ROI: how fresh, how competitive, who it's for, fit, eligibility). For each job: open it, let Simplify fill the form, attach the files from Documents\Apply Today, submit, then hit I applied."
       />
       <ApplyQueue initial={queue} appliedToday={appliedToday} night={lastNight()} folder={applyFolder()} />
     </div>

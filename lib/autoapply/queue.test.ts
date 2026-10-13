@@ -33,10 +33,9 @@ describe("isQueued", () => {
     expect(isQueued(job("f", { deadline: day(-2) }), now)).toBe(false);
   });
 
-  it("drops a batch after three days unless it's pinned", () => {
+  it("keeps older batches until they're applied to, skipped or closed", () => {
     expect(isQueued(job("yesterday", { batch: "2026-10-04" }), now)).toBe(true);
-    expect(isQueued(job("old", { batch: "2026-10-02" }), now)).toBe(false);
-    expect(isQueued(job("old-pinned", { batch: "2026-10-02", pinned: true }), now)).toBe(true);
+    expect(isQueued(job("old", { batch: "2026-09-20" }), now)).toBe(true);
   });
 });
 
@@ -49,9 +48,10 @@ describe("queueOrder", () => {
     expect(order).toEqual(["closing", "later", "high", "low"]);
   });
 
-  it("adds each night's batch to the end, even a closing-soon or better-fit job", () => {
-    const order = queueOrder([job("newer", { fitScore: 95, deadline: day(1) }), job("older", { batch: "2026-10-04", fitScore: 60 })], now).map((j) => j.id);
-    expect(order).toEqual(["older", "newer"]);
+  it("ranks across batches by ROI when given one", () => {
+    const roi: Record<string, number> = { older: 40, newer: 80 };
+    const order = queueOrder([job("older", { batch: "2026-10-04" }), job("newer")], now, (j) => roi[j.id]).map((j) => j.id);
+    expect(order).toEqual(["newer", "older"]);
   });
 
   it("puts a pinned job ahead of everything", () => {

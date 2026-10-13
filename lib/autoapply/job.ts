@@ -51,11 +51,14 @@ export type Job = {
   /** The posting's fit score and deadline when the batch picked it, to order the morning queue. */
   fitScore?: number | null;
   deadline?: string | null;
+  /** For jobs with no posting in the Jobs list: when it was posted, and the fit reasons scored from jd.txt. */
+  postedAt?: string;
+  fitReasons?: string[];
   /** Owen skipped it in the morning queue. */
   skippedAt?: string;
   /** Added to the queue by hand (e.g. a job he was invited to apply to): goes first. */
   pinned?: boolean;
-  /** Stays in the queue past the usual few days, until applied to or skipped. */
+  /** Legacy: kept older jobs in the queue back when batches dropped off after three days. */
   keep?: boolean;
   log: { at: string; msg: string }[];
 };

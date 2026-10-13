@@ -18,7 +18,7 @@ import { formatDate } from "@/lib/deadline";
 import { relativeTime } from "@/lib/format";
 import { nextTerm, termForDate, termLabel, termShortLabel } from "@/lib/terms";
 import { listJobs } from "@/lib/autoapply/job";
-import { queueOrder } from "@/lib/autoapply/queue";
+import { rankedQueue } from "@/lib/autoapply/rankedQueue";
 
 export const dynamic = "force-dynamic";
 
@@ -85,7 +85,7 @@ export default async function HomePage() {
   const term = termForDate(now);
   const dateLine = new Intl.DateTimeFormat("en-US", { timeZone: "America/Toronto", weekday: "long", month: "long", day: "numeric" }).format(now);
   const upNext = [...overdue, ...agenda];
-  const applyQueue = process.env.AUTO_APPLY_ENABLED === "1" ? queueOrder(listJobs(), now) : [];
+  const applyQueue = process.env.AUTO_APPLY_ENABLED === "1" ? await rankedQueue(listJobs(), now) : [];
 
   return (
     <div className="mx-auto max-w-3xl space-y-10">
