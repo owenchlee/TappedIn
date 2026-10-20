@@ -11,12 +11,15 @@
  *   npm run nightly -- --max-age 7       # only jobs posted in the last 7 days (default 14, or NIGHTLY_MAX_AGE_DAYS)
  *   npm run nightly -- --dry-run         # only print what it would pick
  *   npm run nightly -- --no-refresh      # skip refreshing the job lists first
+ *   npm run nightly -- --no-inbox        # skip the Gmail check (rejections, OAs, interviews → applications)
+ *   npm run nightly -- --inbox-only      # only the Gmail check
  */
 import "dotenv/config";
 import { spawn, spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { PRIVATE_DIR, readJob, writeJob } from "../lib/autoapply/job";
+import { readInboxState } from "../lib/autoapply/inbox";
 import type { NightlyPick } from "../lib/autoapply/nightly";
 import { budgetStop, retryAt, weeklyUsedSince } from "../lib/autoapply/usage";
 
@@ -86,6 +89,26 @@ function writeReport(results: Result[], queued: number, notes: string[]) {
       : `Weekly limit: ${weekly.before}% → ${weekly.after}%, so tonight used ${weekly.used}%.`);
 }
 
+/** Has Claude read Gmail for rejections, OAs, interviews and offers, and updates the applications. */
+// Its own process (scripts/inbox.ts), like the tailoring: Node on Windows can crash on exit after
+// running claude in-process, and that shouldn't take the night down.
+async function inboxCheck(notes: string[]) {
+  say("Checking Gmail for news on applications");
+  const started = Date.now();
+  const { cmd, args } = tsx("inbox.ts", []);
+  await new Promise<void>((resolve) => {
+    const child = spawn(cmd, args, { cwd: process.cwd(), stdio: "inherit", windowsHide: true });
+    const timer = setTimeout(() => child.kill(), 20 * 60_000);
+    child.on("close", () => (clearTimeout(timer), resolve()));
+    child.on("error", () => (clearTimeout(timer), resolve()));
+  });
+  const state = readInboxState();
+  if (!state.ranAt || Date.parse(state.ranAt) < started - 5_000) notes.push("Gmail check didn't finish");
+  else if (state.error) notes.push(`Gmail check failed: ${state.error}`);
+  else for (const u of state.applied ?? []) notes.push(`Gmail: ${u.company} · ${u.role} → ${u.status}`);
+  if (notes.at(-1)?.startsWith("Gmail check")) say(notes.at(-1)!);
+}
+
 async function main() {
   mkdirSync(NIGHTLY_DIR, { recursive: true });
   // Another run (e.g. a one-off list) refreshes the lock every job: wait for it, then pick tonight's jobs.
@@ -108,7 +131,7 @@ async function main() {
     const up = spawnSync(app.cmd, app.args, { cwd: process.cwd(), stdio: "inherit", windowsHide: true });
     if (up.status !== 0) throw new Error("Couldn't start the database or the app (output above)");
 
-    if (!flag("no-refresh") && !dryRun) {
+    if (!flag("no-refresh") && !dryRun && !flag("inbox-only")) {
       say("Refreshing the job lists (a few minutes)");
       try {
         await api("/api/cron/refresh", { method: "POST" }, 8 * 60_000);
@@ -117,6 +140,13 @@ async function main() {
         say(notes.at(-1)!);
       }
     }
+
+    if (!dryRun && !flag("no-inbox")) {
+      const stop = budgetStop();
+      if (stop) notes.push(`Skipped the Gmail check: ${stop}.`);
+      else await inboxCheck(notes);
+    }
+    if (flag("inbox-only")) return;
 
     const { queued, picks } = await api<{ queued: number; picks: NightlyPick[] }>(`/api/cron/nightly?target=${target}&minScore=${minScore}&maxAgeDays=${maxAgeDays}`);
     say(`${queued} still waiting in the queue; tailoring ${picks.length} new (up to ${target}, min score ${minScore}, posted in the last ${maxAgeDays} days)`);
