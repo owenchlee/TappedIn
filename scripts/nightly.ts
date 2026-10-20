@@ -135,7 +135,7 @@ async function main() {
       writeFileSync(LOCK, String(process.pid));
       const started = Date.now();
       try {
-        r.jobId = (await api<{ jobId: string }>("/api/cron/nightly", { method: "POST", body: JSON.stringify({ postingId: r.postingId, batch }) })).jobId;
+        r.jobId = (await api<{ jobId: string }>("/api/cron/nightly", { method: "POST", body: JSON.stringify({ postingId: r.postingId, batch, applyUrl: r.applyUrl, applyUrlNote: r.applyUrlNote }) })).jobId;
       } catch (err) {
         r.status = "failed";
         r.note = err instanceof Error ? err.message : String(err);

@@ -6,7 +6,9 @@ import path from "node:path";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { spawnHidden } from "@/lib/spawnHidden";
-import { createJob, jobDir, readJob, writeJob, type Job } from "@/lib/autoapply/job";
+import { PRIVATE_DIR, createJob, isValidJobId, jobDir, listJobs, readJob, writeJob, type Job } from "@/lib/autoapply/job";
+import { PREFILL_ERROR, prefillError, prefillRunning, readPrefill, writePrefill, type PrefillView } from "@/lib/autoapply/prefill";
+import { rankedQueue } from "@/lib/autoapply/rankedQueue";
 import { isResumeBase, type ResumeBase } from "@/lib/autoapply/base";
 import { setStage, trackPosting } from "@/actions/applications";
 import { findOrCreateManualPosting } from "@/lib/postings";
@@ -179,4 +181,52 @@ export async function skipQueuedJob(jobId: string): Promise<void> {
   job.skippedAt = new Date().toISOString();
   writeJob(job);
   revalidatePath("/apply/queue");
+}
+
+/**
+ * "Process top N": opens the top N queued jobs that haven't been prefilled yet in Owen's Chrome and
+ * gets each form filled (scripts/prefill.ts). Returns the job ids it started.
+ */
+export async function startPrefill(count = 10): Promise<string[]> {
+  assertEnabled();
+  if (prefillRunning()) throw new Error("A batch is already being prefilled. Wait for it to finish.");
+  const queue = await rankedQueue(listJobs());
+  const ids = queue.filter((j) => !readPrefill(j.id)).slice(0, Math.max(1, Math.min(20, count))).map((j) => j.id);
+  if (!ids.length) throw new Error("Every job in the queue has already been prefilled.");
+  rmSync(PREFILL_ERROR, { force: true });
+  for (const id of ids) writePrefill(id, { state: "queued" });
+  const root = process.cwd();
+  const tsxCli = path.join(root, "node_modules", "tsx", "dist", "cli.mjs");
+  spawnHidden(process.execPath, [tsxCli, path.join(root, "scripts", "prefill.ts"), ...ids], { cwd: root, logFile: path.join(PRIVATE_DIR, "prefill.log") });
+  return ids;
+}
+
+/**
+ * "Finish": for queued jobs that stopped at needs_you (Owen made the Workday account / signed in by hand
+ * in the open tab), the worker finds that tab and carries on from there. Returns the job ids it started.
+ */
+export async function finishPrefill(): Promise<string[]> {
+  assertEnabled();
+  if (prefillRunning()) throw new Error("A batch is already being filled. Wait for it to finish.");
+  const queue = await rankedQueue(listJobs());
+  const ids = queue.filter((j) => readPrefill(j.id)?.state === "needs_you").map((j) => j.id);
+  if (!ids.length) throw new Error("Nothing is waiting on you.");
+  rmSync(PREFILL_ERROR, { force: true });
+  for (const id of ids) writePrefill(id, { ...readPrefill(id)!, state: "queued", note: "Waiting to finish" });
+  const root = process.cwd();
+  const tsxCli = path.join(root, "node_modules", "tsx", "dist", "cli.mjs");
+  spawnHidden(process.execPath, [tsxCli, path.join(root, "scripts", "prefill.ts"), "--resume", ...ids], { cwd: root, logFile: path.join(PRIVATE_DIR, "prefill.log") });
+  return ids;
+}
+
+/** Where each job's prefill is at (null: never prefilled), for the queue page's poller. */
+export async function prefillStatus(jobIds: string[]): Promise<{ running: boolean; error: string | null; jobs: Record<string, PrefillView | null> }> {
+  assertEnabled();
+  const jobs: Record<string, PrefillView | null> = {};
+  for (const id of jobIds) {
+    const p = isValidJobId(id) ? readPrefill(id) : null;
+    const job = p && readJob(id);
+    jobs[id] = p && { ...p, applyUrl: job?.applyUrl, closed: Boolean(job?.closedAt) };
+  }
+  return { running: prefillRunning(), error: prefillError(), jobs };
 }

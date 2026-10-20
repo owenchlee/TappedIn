@@ -7,13 +7,14 @@ import { getJobPrefs } from "@/lib/fit/store";
 import { termsInText } from "@/lib/fit/requirements";
 import { usVisaOk } from "./sponsors";
 import { inTargetTerm, isQueued, mentionsCanada, realismScore, spreadPicks, unrealisticTitle } from "./queue";
+import { findRealSource, isThirdParty } from "./source";
 
 // The app side of the nightly batch (scripts/nightly.ts drives it through /api/cron/nightly, so the
 // one-connection local database is only ever used by the app). Picks recent jobs a first-year in
 // Canada can realistically get and hasn't touched, and creates one tailoring job at a time; the
 // script runs the tailoring.
 
-export type NightlyPick = { postingId: string; company: string; role: string; fitScore: number | null; deadline: string | null };
+export type NightlyPick = { postingId: string; company: string; role: string; fitScore: number | null; deadline: string | null; applyUrl?: string; applyUrlNote?: string };
 
 const HOUR = 3_600_000;
 const DAY = 24 * HOUR;
@@ -56,7 +57,7 @@ export async function pickNightly(opts: { target: number; minScore: number; maxA
         { NOT: { flags: { has: "upper_pref" } } },
       ],
     },
-    select: { id: true, company: true, role: true, region: true, terms: true, fitScore: true, fitReasons: true, postedAt: true, firstSeenAt: true, deadline: true },
+    select: { id: true, company: true, role: true, url: true, region: true, terms: true, fitScore: true, fitReasons: true, postedAt: true, firstSeenAt: true, deadline: true },
     take: 1000,
   });
 
@@ -68,7 +69,7 @@ export async function pickNightly(opts: { target: number; minScore: number; maxA
 
   // Walk the ranking, reading each posting's text: its own term has to agree, a U.S. job needs a visa
   // sponsor, and a remote job counts once the text mentions Canada (or it's a U.S. one with a sponsor).
-  const eligible: typeof ranked = [];
+  const eligible: ((typeof ranked)[number] & { applyUrl?: string; applyUrlNote?: string })[] = [];
   for (let i = 0; i < ranked.length && spreadPicks(eligible, opts.target, 2, MAX_BIG).length < opts.target; i += TEXT_BATCH) {
     const slice = ranked.slice(i, i + TEXT_BATCH);
     const texts = new Map(
@@ -78,7 +79,13 @@ export async function pickNightly(opts: { target: number; minScore: number; maxA
       const text = texts.get(r.id) ?? "";
       if (!inTargetTerm(r.terms, r.role, targetTerms, termsInText(`${r.role}\n${text}`))) continue;
       if (r.region === "us" && !usVisaOk(r.company, text)) continue;
-      if (r.region !== "remote" || mentionsCanada(text) || usVisaOk(r.company, text)) eligible.push(r);
+      if (r.region !== "remote" || mentionsCanada(text) || usVisaOk(r.company, text)) {
+        // A job-board listing: find the employer's own posting, and pass on one that's probably been
+        // taken down before any Claude time goes into tailoring for it (there are plenty of others).
+        const src = isThirdParty(r.url) ? await findRealSource(r) : null;
+        if (src?.url === null && src.likelyClosed) continue;
+        eligible.push(src ? { ...r, applyUrl: src.url ?? undefined, applyUrlNote: src.how } : r);
+      }
     }
   }
 
@@ -88,12 +95,14 @@ export async function pickNightly(opts: { target: number; minScore: number; maxA
     role: r.role,
     fitScore: r.fitScore,
     deadline: r.deadline?.toISOString() ?? null,
+    applyUrl: r.applyUrl,
+    applyUrlNote: r.applyUrlNote,
   }));
   return { queued, picks };
 }
 
 /** Creates the tailoring job for one pick (job.json + the posting text); the caller runs it. */
-export async function createNightlyJob(postingId: string, batch: string): Promise<string> {
+export async function createNightlyJob(postingId: string, batch: string, source?: { applyUrl?: string; applyUrlNote?: string }): Promise<string> {
   const p = await prisma.coopPosting.findUniqueOrThrow({
     where: { id: postingId },
     select: { id: true, company: true, role: true, url: true, region: true, details: true, fitScore: true, deadline: true },
@@ -107,6 +116,8 @@ export async function createNightlyJob(postingId: string, batch: string): Promis
     batch,
     fitScore: p.fitScore,
     deadline: p.deadline?.toISOString() ?? null,
+    applyUrl: source?.applyUrl,
+    applyUrlNote: source?.applyUrlNote,
   });
   if (p.details?.trim()) writeFileSync(path.join(jobDir(job.id), "jd.txt"), p.details);
   return job.id;

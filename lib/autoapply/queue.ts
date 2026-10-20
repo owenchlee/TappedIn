@@ -16,7 +16,7 @@ export const CLOSING_SOON_MS = 72 * HOUR;
  * Jobs wait however many nights it takes; only a passed deadline drops one (Owen's call, 2026-10-13).
  */
 export function isQueued(job: Job, now = new Date()): boolean {
-  if (!job.batch || job.submittedAt || job.skippedAt || job.status !== "ready") return false;
+  if (!job.batch || job.submittedAt || job.skippedAt || job.closedAt || job.status !== "ready") return false;
   return !job.deadline || Date.parse(job.deadline) > now.getTime() - 12 * HOUR;
 }
 

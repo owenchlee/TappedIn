@@ -25,6 +25,12 @@ export type Job = {
   company: string;
   role: string;
   url: string;
+  /** The employer's own posting when `url` is a job board like csjobs.ca (lib/autoapply/source.ts). Apply here. */
+  applyUrl?: string;
+  /** How applyUrl was found, or why it couldn't be. */
+  applyUrlNote?: string;
+  /** The employer took the posting down; it leaves the queue. */
+  closedAt?: string;
   /** The posting's region (canada | remote | us | intl) when it came from the Jobs list. */
   region?: string | null;
   status: JobStatus;
@@ -109,7 +115,7 @@ export function newJobId(company: string, role: string, now = new Date()): strin
   return `${stamp}-${slug(`${company}-${role}`) || "job"}`;
 }
 
-export function createJob(input: Pick<Job, "source" | "company" | "role" | "url" | "region"> & Partial<Pick<Job, "batch" | "fitScore" | "deadline">>): Job {
+export function createJob(input: Pick<Job, "source" | "company" | "role" | "url" | "region"> & Partial<Pick<Job, "batch" | "fitScore" | "deadline" | "applyUrl" | "applyUrlNote">>): Job {
   const now = new Date();
   const job: Job = {
     id: newJobId(input.company, input.role, now),

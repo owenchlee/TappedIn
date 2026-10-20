@@ -5,6 +5,7 @@ import { notFound } from "next/navigation";
 import { PRIVATE_DIR, listJobs } from "@/lib/autoapply/job";
 import { applyFolder } from "@/lib/autoapply/queue";
 import { rankedQueue } from "@/lib/autoapply/rankedQueue";
+import { prefillRunning, readPrefill, type PrefillView } from "@/lib/autoapply/prefill";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { ApplyQueue, type NightSummary } from "@/components/autoapply/ApplyQueue";
 
@@ -37,15 +38,20 @@ export default async function ApplyQueuePage() {
   const jobs = listJobs();
   const queue = await rankedQueue(jobs);
   const today = new Date().toDateString();
+  const prefill: Record<string, PrefillView | null> = {};
+  for (const j of queue) {
+    const p = readPrefill(j.id);
+    prefill[j.id] = p && { ...p, applyUrl: j.applyUrl };
+  }
   const appliedToday = jobs.filter((j) => j.batch && j.submittedAt && new Date(j.submittedAt).toDateString() === today).length;
 
   return (
     <div className="mx-auto max-w-3xl">
       <PageHeader
         title="Apply queue"
-        description="Tailored overnight, best odds first (ROI: how fresh, how competitive, who it's for, fit, eligibility). For each job: open it, let Simplify fill the form, attach the files from Documents\Apply Today, submit, then hit I applied."
+        description="Tailored overnight, best odds first (ROI: how fresh, how competitive, who it's for, fit, eligibility). Hit Process top 10 and Claude opens each one in Chrome, runs Simplify and attaches the tailored resume. You review each tab, submit it, then hit I applied."
       />
-      <ApplyQueue initial={queue} appliedToday={appliedToday} night={lastNight()} folder={applyFolder()} />
+      <ApplyQueue initial={queue} appliedToday={appliedToday} night={lastNight()} folder={applyFolder()} prefill={prefill} prefillRunning={prefillRunning()} />
     </div>
   );
 }

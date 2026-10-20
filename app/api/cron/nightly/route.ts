@@ -25,9 +25,9 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   const no = denied(req);
   if (no) return no;
-  const body = (await req.json().catch(() => null)) as { postingId?: string; batch?: string } | null;
+  const body = (await req.json().catch(() => null)) as { postingId?: string; batch?: string; applyUrl?: string; applyUrlNote?: string } | null;
   if (!body?.postingId || !body.batch || !/^\d{4}-\d{2}-\d{2}$/.test(body.batch)) {
     return Response.json({ error: "postingId and batch (YYYY-MM-DD) are required" }, { status: 400 });
   }
-  return Response.json({ jobId: await createNightlyJob(body.postingId, body.batch) });
+  return Response.json({ jobId: await createNightlyJob(body.postingId, body.batch, { applyUrl: body.applyUrl, applyUrlNote: body.applyUrlNote }) });
 }

@@ -14,6 +14,8 @@ export function runClaude(opts: {
   allowedTools: string[];
   model?: string;
   timeoutMs?: number;
+  /** More constant CLI flags, e.g. ["--chrome"]. Never anything user-derived (the shell sees them). */
+  extraArgs?: string[];
 }): Promise<ClaudeRun> {
   const args = [
     "-p",
@@ -28,6 +30,7 @@ export function runClaude(opts: {
   ];
   const model = opts.model ?? process.env.AUTO_APPLY_MODEL;
   if (model) args.push("--model", model);
+  if (opts.extraArgs) args.push(...opts.extraArgs);
 
   return new Promise((resolve) => {
     // shell: true because on Windows `claude` is an npm .cmd shim; every arg above is a constant.
