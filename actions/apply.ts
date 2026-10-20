@@ -219,6 +219,22 @@ export async function finishPrefill(): Promise<string[]> {
   return ids;
 }
 
+/**
+ * "Check resumes": a read-only second look at every open tab (ready or needs_you) to confirm the resume
+ * in the form is that job's tailored PDF. Doesn't touch the forms. Returns the job ids it's checking.
+ */
+export async function verifyPrefill(): Promise<string[]> {
+  assertEnabled();
+  if (prefillRunning()) throw new Error("A batch is running. Wait for it to finish.");
+  const queue = await rankedQueue(listJobs());
+  const ids = queue.filter((j) => ["ready", "needs_you"].includes(readPrefill(j.id)?.state ?? "")).map((j) => j.id);
+  if (!ids.length) throw new Error("No filled tabs to check.");
+  const root = process.cwd();
+  const tsxCli = path.join(root, "node_modules", "tsx", "dist", "cli.mjs");
+  spawnHidden(process.execPath, [tsxCli, path.join(root, "scripts", "prefill.ts"), "--verify", ...ids], { cwd: root, logFile: path.join(PRIVATE_DIR, "prefill.log") });
+  return ids;
+}
+
 /** Where each job's prefill is at (null: never prefilled), for the queue page's poller. */
 export async function prefillStatus(jobIds: string[]): Promise<{ running: boolean; error: string | null; jobs: Record<string, PrefillView | null> }> {
   assertEnabled();

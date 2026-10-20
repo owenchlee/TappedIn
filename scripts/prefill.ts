@@ -2,7 +2,10 @@
  * Prefill: opens each job's application in Owen's Chrome and gets it filled, all at once, so he only
  * reviews and submits. Started by the "Process top 10" button on /apply/queue; can also be run by hand:
  *
- *   npx tsx scripts/prefill.ts [--resume] <jobId> [<jobId> ...]
+ *   npx tsx scripts/prefill.ts [--resume | --verify] <jobId> [<jobId> ...]
+ *
+ * Every run compares the resume the form ended up holding with the job's tailored PDF by file size
+ * (resumeCheck in prefill.json); --verify repeats that check read-only on tabs that are already open.
  *
  * --resume is the "Finish" button: for jobs that stopped at needs_you (a Workday account, say) and that
  * Owen has since sorted out in the open tab. The worker finds that tab and carries on from there.
@@ -13,16 +16,18 @@
  * (PREFILL_CONCURRENCY to cap it). A Windows notification says when they're all done.
  */
 import "dotenv/config";
-import { existsSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { runClaude } from "../lib/autoapply/claude";
 import { PRIVATE_DIR, jobDir, readJob, writeJob } from "../lib/autoapply/job";
-import { PREFILL_ERROR, PREFILL_LOCK, parseResult, prefillPrompt, readPrefill, writePrefill, type Prefill } from "../lib/autoapply/prefill";
+import { PREFILL_ERROR, PREFILL_LOCK, checkResume, parseResult, prefillPrompt, readPrefill, verifyPrompt, writePrefill, type Prefill, type ReportedResume, type ResumeCheck } from "../lib/autoapply/prefill";
 import { findRealSource, isThirdParty } from "../lib/autoapply/source";
 import { notify } from "../lib/notify";
 
 // --resume: Owen has since made the account / signed in by hand in the job's open tab; carry on from there.
 const resuming = process.argv.includes("--resume");
+// --verify: don't fill anything; re-read each job's open tab and compare its resume with the tailored PDF.
+const verifying = process.argv.includes("--verify");
 const ids = process.argv.slice(2).filter((a) => !a.startsWith("--"));
 const concurrency = Math.max(1, Number(process.env.PREFILL_CONCURRENCY) || ids.length || 1);
 // Browser work is screenshots and clicks, not writing: Sonnet does it fine for far fewer credits.
@@ -75,8 +80,50 @@ async function prefillOne(jobId: string) {
     fresh.applyUrlNote = "found by the Chrome worker";
     writeJob(fresh);
   }
-  set(jobId, { state: r.state, note: r.closed ? `Closed: ${r.note ?? "the employer took it down"}` : r.note, url: r.url, costUsd: Math.round(run.costUsd * 100) / 100, finishedAt: new Date().toISOString() });
-  say(`${job.company}: ${r.state}${r.note ? ` (${r.note})` : ""}`);
+  // Don't take the worker's word that "ready" means the right resume: compare what the form holds with the PDF.
+  const resumeCheck = r.state === "failed" || r.closed ? undefined : { ...checkResume(r.resume, statSync(resume).size), checkedAt: new Date().toISOString() };
+  const wrongResume = r.state === "ready" && resumeCheck?.status === "mismatch";
+  set(jobId, {
+    state: wrongResume ? "needs_you" : r.state,
+    note: r.closed ? `Closed: ${r.note ?? "the employer took it down"}` : wrongResume ? `${resumeCheck!.detail} Swap in the right one.` : r.note,
+    url: r.url,
+    resumeCheck,
+    costUsd: Math.round(run.costUsd * 100) / 100,
+    finishedAt: new Date().toISOString(),
+  });
+  say(`${job.company}: ${r.state}${r.note ? ` (${r.note})` : ""}${resumeCheck ? ` [resume ${resumeCheck.status}]` : ""}`);
+}
+
+/** --verify: look at the open tab again (read-only) and compare the attached resume with the job's PDF. */
+async function verifyOne(jobId: string) {
+  const job = readJob(jobId);
+  const resume = path.join(jobDir(jobId), "upload", "Owen_Lee_Resume.pdf");
+  if (!job || !existsSync(resume)) return;
+  const prev = readPrefill(jobId);
+  const run = await runClaude({
+    cwd: jobDir(jobId),
+    prompt: verifyPrompt(job, prev?.url ?? job.applyUrl),
+    allowedTools: ["mcp__claude-in-chrome"],
+    model: "haiku",
+    extraArgs: ["--chrome"],
+    timeoutMs: 5 * 60_000,
+  });
+  const line = run.result.trim().split("\n").reverse().find((l) => l.trim().startsWith("{"));
+  let seen: { found?: boolean; resume?: ReportedResume } = {};
+  try {
+    seen = JSON.parse(line ?? "");
+  } catch {
+    // leave empty: reported as unable to check
+  }
+  const resumeCheck: ResumeCheck = !run.ok || seen.found === undefined
+    ? { status: "unverified", detail: "The re-check couldn't read the tab. Open the resume to compare." }
+    : seen.found === false
+      ? { status: "unverified", detail: "The re-check couldn't find this job's tab (closed?)." }
+      : checkResume(seen.resume, statSync(resume).size);
+  // A wrong resume found later also pulls a "ready" job back to needs_you.
+  const wrong = resumeCheck.status === "mismatch" && prev?.state === "ready";
+  set(jobId, { resumeCheck: { ...resumeCheck, checkedAt: new Date().toISOString() }, ...(wrong && { state: "needs_you" as const, note: `${resumeCheck.detail} Swap in the right one.` }) });
+  say(`${job.company}: resume ${resumeCheck.status}`);
 }
 
 async function main() {
@@ -95,11 +142,23 @@ async function main() {
   if (!/\bCONNECTED\b/.test(check.result) || /NOT_CONNECTED/.test(check.result)) {
     // Nothing was tried, so these jobs stay up for the next Process click.
     // (A resume leaves them as they were: still "needs you", ready for another Finish.)
-    if (!resuming) for (const id of ids) rmSync(path.join(jobDir(id), "prefill.json"), { force: true });
+    if (!resuming && !verifying) for (const id of ids) rmSync(path.join(jobDir(id), "prefill.json"), { force: true });
     const msg = "The Claude in Chrome extension isn't connected. Open Chrome, make sure the extension is on and signed in, then hit Process again.";
     writeFileSync(PREFILL_ERROR, msg);
     notify("Couldn't start filling applications", msg);
     say(`✗ ${msg} (${check.error ?? check.result.slice(0, 200)})`);
+    return;
+  }
+  if (verifying) {
+    const todo = [...ids];
+    const worker = async () => {
+      for (let id = todo.shift(); id; id = todo.shift()) await verifyOne(id).catch((err) => say(`✗ ${id}: ${err instanceof Error ? err.message : err}`));
+    };
+    await Promise.all(Array.from({ length: Math.min(concurrency, ids.length, 3) }, worker));
+    const checks = ids.map((id) => readPrefill(id)?.resumeCheck?.status);
+    const count = (s: string) => checks.filter((c) => c === s).length;
+    notify(`Resume re-check: ${count("verified")} verified`, [count("mismatch") && `${count("mismatch")} WRONG`, count("unverified") && `${count("unverified")} can't tell`].filter(Boolean).join(" · ") || "All match.");
+    say(`Verified ${count("verified")}, mismatch ${count("mismatch")}, unverified ${count("unverified")}`);
     return;
   }
   say(`Prefilling ${ids.length} jobs, ${concurrency} at a time`);

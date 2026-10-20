@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { SectionTitle } from "@/components/ui/PageHeader";
 import { FitScore } from "@/components/jobs/FitSummary";
-import { finishPrefill, markAutoApplySubmitted, openApplyFolder, prefillStatus, skipQueuedJob, stageApplyFiles, startPrefill } from "@/actions/apply";
+import { finishPrefill, markAutoApplySubmitted, openApplyFolder, prefillStatus, skipQueuedJob, stageApplyFiles, startPrefill, verifyPrefill } from "@/actions/apply";
 import type { PrefillView } from "@/lib/autoapply/prefill";
 import { isThirdParty } from "@/lib/autoapply/source";
 import { RESUME_BASE_LABELS } from "@/lib/autoapply/base";
@@ -123,6 +123,15 @@ export function ApplyQueue({
     });
   }, [run]);
 
+  // A read-only second look at every filled tab: is the resume in each form that job's tailored PDF?
+  const recheck = useCallback(() => {
+    run(async () => {
+      await verifyPrefill();
+      setFlash("Re-checking the resumes in your Chrome tabs. You'll get a notification.");
+      setProcessing(true);
+    });
+  }, [run]);
+
   // The employer's own posting; a job-board link (csjobs.ca etc.) only when that hasn't been found.
   const applyUrl = (pf?.applyUrl ?? job?.applyUrl ?? job?.url) || "";
   const boardOnly = Boolean(job && isThirdParty(applyUrl));
@@ -217,6 +226,15 @@ export function ApplyQueue({
         </Card>
       )}
 
+      {!processing && Object.values(prefill).some((p) => p && ["ready", "needs_you"].includes(p.state)) && (
+        <div className="flex flex-wrap items-center gap-2 text-xs text-muted">
+          <span>Not sure the right resume got attached?</span>
+          <Button size="xs" variant="ghost" disabled={isPending} onClick={recheck}>
+            <Check /> Re-check resumes
+          </Button>
+        </div>
+      )}
+
       {(toProcess > 0 || processing) && (
         <Card className="flex flex-wrap items-center gap-3 p-4">
           <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-accent-soft text-accent">
@@ -286,6 +304,7 @@ export function ApplyQueue({
           </div>
 
           {pf && <PrefillLine p={pf} />}
+          {pf && <ResumeCheckLine p={pf} />}
           {boardOnly && !pf && (
             <p className="flex items-start gap-2 rounded-lg bg-amber/12 px-3 py-2 text-sm text-amber">
               <AlertTriangle className="mt-0.5 size-4 shrink-0" /> This link is a job board, not {job.company}&apos;s own posting. Apply on {job.company}&apos;s careers site, not through the board.
@@ -470,12 +489,32 @@ function PrefillPill({ p }: { p: PrefillView }) {
   );
 }
 
+/** Whether the resume in the form is this job's tailored PDF, checked by file size (not by Claude's word). */
+function ResumeCheckLine({ p }: { p: PrefillView }) {
+  const c = p.resumeCheck;
+  if (!c) return null;
+  const look = {
+    verified: { icon: Check, className: "bg-emerald/10 text-emerald", label: "Resume verified" },
+    unverified: { icon: AlertTriangle, className: "bg-amber/12 text-amber", label: "Resume not verified" },
+    mismatch: { icon: AlertTriangle, className: "bg-overdue/10 text-overdue", label: "Wrong resume" },
+  }[c.status];
+  const Icon = look.icon;
+  return (
+    <p className={`flex items-start gap-2 rounded-lg px-3 py-1.5 text-xs ${look.className}`}>
+      <Icon className="mt-0.5 size-3.5 shrink-0" />
+      <span>
+        <b>{look.label}.</b> {c.detail}
+      </span>
+    </p>
+  );
+}
+
 /** What Claude did with this job's Chrome tab. */
 function PrefillLine({ p }: { p: PrefillView }) {
   const look = PREFILL_LOOK[p.state];
   const text =
     p.state === "ready"
-      ? "Filled in its own Chrome tab with the tailored resume attached. Review it there and submit."
+      ? "Filled in its own Chrome tab. Review it there and submit."
       : p.state === "needs_you"
         ? "Open in Chrome, but it needs you"
         : p.state === "failed"
