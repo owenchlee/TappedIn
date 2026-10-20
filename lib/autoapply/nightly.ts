@@ -7,6 +7,7 @@ import { getJobPrefs } from "@/lib/fit/store";
 import { termsInText } from "@/lib/fit/requirements";
 import { usVisaOk } from "./sponsors";
 import { inTargetTerm, isQueued, mentionsCanada, realismScore, spreadPicks, unrealisticTitle } from "./queue";
+import { roiScore } from "./roi";
 import { findRealSource, isThirdParty } from "./source";
 
 // The app side of the nightly batch (scripts/nightly.ts drives it through /api/cron/nightly, so the
@@ -24,6 +25,9 @@ const TEXT_BATCH = 20;
 // Household-name companies (bigCompany) per night: they already rank last, and this keeps a thin
 // night from filling up with them anyway. Owen would rather apply where his odds are real.
 const MAX_BIG = 1;
+// The lowest ROI (lib/autoapply/roi.ts) worth tailoring for. Below this the odds of an interview are
+// too slim to spend Claude credits on: stale postings, household names, U.S. roles without a visa.
+const MIN_ROI = 50;
 
 export async function pickNightly(opts: { target: number; minScore: number; maxAgeDays: number }): Promise<{ queued: number; picks: NightlyPick[] }> {
   const jobs = listJobs();
@@ -57,13 +61,15 @@ export async function pickNightly(opts: { target: number; minScore: number; maxA
         { NOT: { flags: { has: "upper_pref" } } },
       ],
     },
-    select: { id: true, company: true, role: true, url: true, region: true, terms: true, fitScore: true, fitReasons: true, postedAt: true, firstSeenAt: true, deadline: true },
+    select: { id: true, company: true, role: true, url: true, region: true, terms: true, fitScore: true, fitReasons: true, flags: true, postedAt: true, firstSeenAt: true, deadline: true },
     take: 1000,
   });
 
   const now = new Date();
   const ranked = rows
     .filter((r) => !taken.has(r.id) && !takenTitles.has(key(r.company, r.role)) && !unrealisticTitle(r.role) && inTargetTerm(r.terms, r.role, targetTerms))
+    // Scored with the same posting date as the queue page (rankedQueue.ts).
+    .filter((r) => roiScore({ ...r, postedAt: r.postedAt && r.postedAt < r.firstSeenAt ? r.postedAt : r.firstSeenAt }, now).score >= MIN_ROI)
     .map((r) => ({ ...r, rank: realismScore(r, now) }))
     .sort((a, b) => b.rank - a.rank);
 
