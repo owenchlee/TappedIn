@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Job } from "./job";
-import { bigCompany, inTargetTerm, isQueued, labelPdf, mentionsCanada, queueOrder, realismScore, spreadPicks, unrealisticTitle } from "./queue";
+import { bigCompany, clashesWithSchool, inTargetTerm, isQueued, labelPdf, longInPerson, mentionsCanada, queueOrder, realismScore, spreadPicks, unrealisticTitle } from "./queue";
 import { termsInText } from "@/lib/fit/requirements";
 
 const now = new Date("2026-10-05T12:00:00Z");
@@ -31,6 +31,8 @@ describe("isQueued", () => {
     expect(isQueued(job("d", { skippedAt: day(0) }), now)).toBe(false);
     expect(isQueued(job("e", { status: "failed" }), now)).toBe(false);
     expect(isQueued(job("f", { deadline: day(-2) }), now)).toBe(false);
+    expect(isQueued(job("g", { warnings: ["Requires U.S. citizenship"], region: "us" }), now)).toBe(false);
+    expect(isQueued(job("h", { warnings: ["No visa sponsorship"], region: "canada" }), now)).toBe(true);
   });
 
   it("keeps older batches until they're applied to, skipped or closed", () => {
@@ -126,6 +128,27 @@ describe("inTargetTerm", () => {
   it("rejects a multi-term placement that starts before the target term", () => {
     expect(inTargetTerm(["W27", "S27"], "NPI Hardware Co-op - 8 month", s27)).toBe(false);
     expect(inTargetTerm(["S27", "F27"], "Firmware Co-op (8 months)", s27)).toBe(true);
+  });
+});
+
+describe("longInPerson", () => {
+  it("drops 8+ month placements unless remote", () => {
+    expect(longInPerson("canada", "Firmware Co-op (8 months)")).toBe(true);
+    expect(longInPerson("canada", "Software Co-op", "This is an 8 month co-op term, Jan to Aug")).toBe(true);
+    expect(longInPerson("remote", "Firmware Co-op (8 months)")).toBe(false);
+    expect(longInPerson("canada", "Software Intern", "4 month or 8 month terms available")).toBe(false);
+    expect(longInPerson("canada", "Software Intern")).toBe(false);
+  });
+});
+
+describe("clashesWithSchool", () => {
+  const s27 = ["S27"];
+  it("drops in-person co-ops that touch a school term, keeps remote", () => {
+    expect(clashesWithSchool("canada", "Software Co-op", ["S27", "F27"], s27)).toBe(true);
+    expect(clashesWithSchool("canada", "Software Co-op", ["W27"], s27)).toBe(true);
+    expect(clashesWithSchool("canada", "Software Co-op", ["S27"], s27)).toBe(false);
+    expect(clashesWithSchool("remote", "Software Co-op", ["W27"], s27)).toBe(false);
+    expect(clashesWithSchool("canada", "Software Intern", ["S27", "F27"], s27)).toBe(false);
   });
 });
 

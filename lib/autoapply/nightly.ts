@@ -6,7 +6,7 @@ import { createJob, jobDir, listJobs } from "./job";
 import { getJobPrefs } from "@/lib/fit/store";
 import { termsInText } from "@/lib/fit/requirements";
 import { usVisaOk } from "./sponsors";
-import { inTargetTerm, isQueued, mentionsCanada, realismScore, spreadPicks, unrealisticTitle } from "./queue";
+import { clashesWithSchool, inTargetTerm, isQueued, longInPerson, mentionsCanada, realismScore, schoolRegion, spreadPicks, unrealisticTitle } from "./queue";
 import { roiScore } from "./roi";
 import { findRealSource, isThirdParty } from "./source";
 
@@ -45,7 +45,7 @@ export async function pickNightly(opts: { target: number; minScore: number; maxA
     where: {
       AND: [
         { duplicateOfId: null, saved: null, dismissedAt: null, disappearedAt: null, status: { not: "closed" } },
-        { fitScore: { gte: opts.minScore }, detailsStatus: "ok", OR: [{ terms: { hasSome: targetTerms } }, { terms: { isEmpty: true } }] },
+        { fitScore: { gte: opts.minScore }, detailsStatus: "ok", OR: [{ terms: { hasSome: targetTerms } }, { terms: { isEmpty: true } }, { region: "remote" }, { location: { contains: "waterloo", mode: "insensitive" } }, { location: { contains: "kitchener", mode: "insensitive" } }] },
         // Only the fields picked in Settings (software, data, ...): "Not a tech role" costs just 10
         // points, so a non-tech co-op (GIS at a coal mine) could still score in the 80s.
         { category: { in: categories } },
@@ -61,15 +61,20 @@ export async function pickNightly(opts: { target: number; minScore: number; maxA
         { NOT: { flags: { has: "upper_pref" } } },
       ],
     },
-    select: { id: true, company: true, role: true, url: true, region: true, terms: true, fitScore: true, fitReasons: true, flags: true, postedAt: true, firstSeenAt: true, deadline: true },
+    select: { id: true, company: true, role: true, url: true, region: true, location: true, terms: true, fitScore: true, fitReasons: true, flags: true, postedAt: true, firstSeenAt: true, deadline: true },
     take: 1000,
   });
 
   const now = new Date();
   const ranked = rows
-    .filter((r) => !taken.has(r.id) && !takenTitles.has(key(r.company, r.role)) && !unrealisticTitle(r.role) && inTargetTerm(r.terms, r.role, targetTerms))
-    // Scored with the same posting date as the queue page (rankedQueue.ts).
-    .filter((r) => roiScore({ ...r, postedAt: r.postedAt && r.postedAt < r.firstSeenAt ? r.postedAt : r.firstSeenAt }, now).score >= MIN_ROI)
+    .filter((r) => !taken.has(r.id) && !takenTitles.has(key(r.company, r.role)) && !unrealisticTitle(r.role) && !longInPerson(schoolRegion(r.region, r.location), r.role) && !clashesWithSchool(schoolRegion(r.region, r.location), r.role, r.terms, targetTerms) && (schoolRegion(r.region, r.location) === "remote" || inTargetTerm(r.terms, r.role, targetTerms)))
+    // Scored with the same posting date as the queue page (rankedQueue.ts). A U.S. job is scored as
+    // sponsoring: the text check below drops the ones that don't, and most that do (usVisaOk) carry
+    // no "sponsors" flag, so they'd lose points for a visa they don't need.
+    .filter((r) => {
+      const flags = r.region === "us" ? [...r.flags, "sponsors"] : r.flags;
+      return roiScore({ ...r, flags, postedAt: r.postedAt && r.postedAt < r.firstSeenAt ? r.postedAt : r.firstSeenAt }, now).score >= MIN_ROI;
+    })
     .map((r) => ({ ...r, rank: realismScore(r, now) }))
     .sort((a, b) => b.rank - a.rank);
 
@@ -83,7 +88,11 @@ export async function pickNightly(opts: { target: number; minScore: number; maxA
     );
     for (const r of slice) {
       const text = texts.get(r.id) ?? "";
-      if (!inTargetTerm(r.terms, r.role, targetTerms, termsInText(`${r.role}\n${text}`))) continue;
+      const textTerms = termsInText(`${r.role}\n${text}`);
+      const sr = schoolRegion(r.region, r.location);
+      if (sr !== "remote" && !inTargetTerm(r.terms, r.role, targetTerms, textTerms)) continue;
+      if (clashesWithSchool(sr, r.role, r.terms, targetTerms, textTerms)) continue;
+      if (longInPerson(sr, r.role, text)) continue;
       if (r.region === "us" && !usVisaOk(r.company, text)) continue;
       if (r.region !== "remote" || mentionsCanada(text) || usVisaOk(r.company, text)) {
         // A job-board listing: find the employer's own posting, and pass on one that's probably been

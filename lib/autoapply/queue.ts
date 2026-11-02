@@ -16,6 +16,8 @@ export const CLOSING_SOON_MS = 72 * HOUR;
  * Jobs wait however many nights it takes; only a passed deadline drops one (Owen's call, 2026-10-13).
  */
 export function isQueued(job: Job, now = new Date()): boolean {
+  // A posting Owen is not allowed to take (U.S. citizens only, clearance, no sponsorship) never shows up.
+  if (job.warnings?.length && job.region !== "canada") return false;
   if (!job.batch || job.submittedAt || job.skippedAt || job.closedAt || job.status !== "ready") return false;
   return !job.deadline || Date.parse(job.deadline) > now.getTime() - 12 * HOUR;
 }
@@ -56,6 +58,39 @@ export function inTargetTerm(terms: string[], title: string, targets: string[], 
   if (textTerms.length > 0 && !textTerms.some((t) => targets.includes(t))) return false;
   const multi = terms.length > 1 && /\b(8|12|16)[\s-]*months?\b/i.test(title);
   return !multi || targets.includes([...terms].sort((a, b) => termSortKey(a) - termSortKey(b))[0]);
+}
+
+/**
+ * Whether Owen could do the job alongside classes: remote, or close enough to Waterloo to commute
+ * after school. Returned as a region so it can be passed to longInPerson / clashesWithSchool.
+ */
+export function schoolRegion(region: string | null, location: string | null): string | null {
+  return region === "remote" || /\b(waterloo|kitchener|cambridge,?\s*(on|ontario)?)\b/i.test(location ?? "") ? "remote" : region;
+}
+
+const LONG_RE =/\b(8|12|16|eight|twelve|sixteen)[\s-]*months?\b/i;
+const SHORT_RE = /\b(4|four)[\s-]*months?\b/i;
+
+/**
+ * An 8+ month placement that isn't remote. Owen can't leave school for it (an in-person Jan-Aug
+ * co-op); a remote one he can fit around classes. Checked on the title, then on the posting text
+ * unless the text also offers a 4-month term.
+ */
+export function longInPerson(region: string | null, title: string, text = ""): boolean {
+  if (region === "remote") return false;
+  if (LONG_RE.test(title)) return true;
+  return LONG_RE.test(text) && !SHORT_RE.test(text);
+}
+
+/**
+ * An in-person co-op that touches a term Owen is in school for (winter, fall, or a co-op spanning
+ * summer into either). Remote ones are fine: he can work around classes. Internships that list several
+ * terms as options are left alone; a co-op listing several is a multi-term placement.
+ */
+export function clashesWithSchool(region: string | null, title: string, terms: string[], targets: string[], textTerms: string[] = []): boolean {
+  if (region === "remote") return false;
+  if (!/\bco-?op\b/i.test(title)) return false;
+  return [...terms, ...textTerms].some((t) => !targets.includes(t));
 }
 
 /** Whether a remote posting's text says Canadians can take it. */
