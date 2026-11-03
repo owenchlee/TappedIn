@@ -49,7 +49,7 @@ export default async function ApplyQueuePage() {
     <div className="mx-auto max-w-3xl">
       <PageHeader
         title="Apply queue"
-        description="Tailored overnight, best odds first (ROI: how fresh, how competitive, who it's for, fit, eligibility). Hit Process top 10 and Claude opens each one in Chrome, runs Simplify and attaches the tailored resume. You review each tab, submit it, then hit I applied."
+        description="Tailored overnight, best odds first (ROI: how fresh, how competitive, who it's for, fit, eligibility). Hit Process top 3 and Claude opens each one in Chrome, runs Simplify and attaches the tailored resume. You review each tab, submit it, then hit I applied."
       />
       <ApplyQueue initial={queue} appliedToday={appliedToday} night={lastNight()} folder={applyFolder()} prefill={prefill} prefillRunning={prefillRunning()} />
     </div>

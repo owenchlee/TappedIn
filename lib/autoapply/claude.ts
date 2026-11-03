@@ -5,8 +5,8 @@ import { recordUsage } from "./usage";
 // /humanizer skill runs on cover letters instead of a paraphrase of its rules. The prompt goes in
 // on stdin so nothing user-derived is ever interpolated into a shell command line.
 
-export type ToolUse = { name: string; input: Record<string, unknown> };
-export type ClaudeRun = { ok: boolean; result: string; toolUses: ToolUse[]; costUsd: number; error?: string };
+export type ToolUse = { name: string; input: Record<string, unknown>; /** Seconds since the run started. */ at?: number };
+export type ClaudeRun = { ok: boolean; result: string; toolUses: ToolUse[]; costUsd: number; error?: string; timedOut?: boolean; durationMs?: number };
 
 export function runClaude(opts: {
   cwd: string;
@@ -25,8 +25,7 @@ export function runClaude(opts: {
     "--no-session-persistence",
     "--permission-mode",
     "acceptEdits",
-    "--allowedTools",
-    opts.allowedTools.join(","),
+    ...(opts.allowedTools.length ? ["--allowedTools", opts.allowedTools.join(",")] : []),
   ];
   const model = opts.model ?? process.env.AUTO_APPLY_MODEL;
   if (model) args.push("--model", model);
@@ -34,6 +33,7 @@ export function runClaude(opts: {
 
   return new Promise((resolve) => {
     // shell: true because on Windows `claude` is an npm .cmd shim; every arg above is a constant.
+    const started = Date.now();
     const child = spawn("claude", args, { cwd: opts.cwd, shell: true, windowsHide: true });
     const toolUses: ToolUse[] = [];
     let result = "";
@@ -44,7 +44,7 @@ export function runClaude(opts: {
 
     const timer = setTimeout(() => {
       child.kill();
-      resolve({ ok: false, result, toolUses, costUsd, error: "Claude timed out" });
+      resolve({ ok: false, result, toolUses, costUsd, error: "Claude timed out", timedOut: true, durationMs: Date.now() - started });
     }, opts.timeoutMs ?? 10 * 60_000);
 
     child.stdout.on("data", (chunk: Buffer) => {
@@ -65,7 +65,7 @@ export function runClaude(opts: {
           recordUsage(evt.rate_limit_info);
         } else if (evt.type === "assistant" && Array.isArray(evt.message?.content)) {
           for (const part of evt.message.content as { type: string; name?: string; input?: Record<string, unknown> }[]) {
-            if (part.type === "tool_use" && part.name) toolUses.push({ name: part.name, input: part.input ?? {} });
+            if (part.type === "tool_use" && part.name) toolUses.push({ name: part.name, input: part.input ?? {}, at: Math.round((Date.now() - started) / 100) / 10 });
           }
         } else if (evt.type === "result") {
           result = evt.result ?? "";
@@ -84,7 +84,7 @@ export function runClaude(opts: {
     child.on("close", (code) => {
       clearTimeout(timer);
       const ok = code === 0 && !isError;
-      resolve({ ok, result, toolUses, costUsd, error: ok ? undefined : stderr.trim() || result || `claude exited ${code}` });
+      resolve({ ok, result, toolUses, costUsd, error: ok ? undefined : stderr.trim() || result || `claude exited ${code}`, durationMs: Date.now() - started });
     });
 
     child.stdin.end(opts.prompt);

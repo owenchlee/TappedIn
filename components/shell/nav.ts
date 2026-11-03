@@ -8,6 +8,7 @@ import {
   ListChecks,
   Radar,
   Route,
+  Send,
   Settings,
   Trophy,
   UsersRound,
@@ -38,6 +39,7 @@ export const PRIMARY_NAV: NavItem[] = [
 export function youItems(opts: { autoApply: boolean }): NavItem[] {
   return [
     { href: "/contacts", label: "Contacts", icon: Contact, hint: "Recruiters and referrers" },
+    { href: "/outreach", label: "Outreach", icon: Send, hint: "Cold emails to founders" },
     { href: "/journey", label: "Journey", icon: Route, hint: "Your five years, term by term" },
     { href: "/insights", label: "Insights", icon: BarChart3, hint: "How your search is going" },
     ...(opts.autoApply

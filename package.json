@@ -19,7 +19,8 @@
     "coverage:check": "tsx scripts/coverage-check.ts",
     "jobs:details": "tsx scripts/job-details.ts",
     "nightly": "tsx scripts/nightly.ts",
-    "inbox": "tsx scripts/inbox.ts"
+    "inbox": "tsx scripts/inbox.ts",
+    "outreach": "tsx scripts/outreach.ts"
   },
   "dependencies": {
     "@prisma/adapter-pg": "^7.10.0",
@@ -31,6 +32,7 @@
     "next": "16.3.4",
     "node-cron": "^4.6.0",
     "pg": "^8.23.0",
+    "playwright-core": "^1.64.1",
     "react": "19.2.8",
     "react-dom": "19.2.8",
     "zod": "^4.6.1"

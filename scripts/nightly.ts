@@ -12,6 +12,7 @@
  *   npm run nightly -- --dry-run         # only print what it would pick
  *   npm run nightly -- --no-refresh      # skip refreshing the job lists first
  *   npm run nightly -- --no-inbox        # skip the Gmail check (rejections, OAs, interviews → applications)
+ *   npm run nightly -- --no-outreach     # skip the cold-email research and follow-up drafts
  *   npm run nightly -- --inbox-only      # only the Gmail check
  */
 import "dotenv/config";
@@ -109,6 +110,20 @@ async function inboxCheck(notes: string[]) {
   if (notes.at(-1)?.startsWith("Gmail check")) say(notes.at(-1)!);
 }
 
+/** Researches new cold emails and drafts due follow-ups (scripts/outreach.ts). Drafts only. */
+async function outreachPass(notes: string[]) {
+  say("Preparing cold-email hooks, proof docs and follow-ups");
+  const { cmd, args } = tsx("outreach.ts", []);
+  const code = await new Promise<number | null>((resolve) => {
+    const child = spawn(cmd, args, { cwd: process.cwd(), stdio: "inherit", windowsHide: true });
+    const timer = setTimeout(() => child.kill(), 40 * 60_000);
+    child.on("close", (c) => (clearTimeout(timer), resolve(c)));
+    child.on("error", () => (clearTimeout(timer), resolve(null)));
+  });
+  // Node on Windows can crash on exit after running claude (see inboxCheck), so the exit code means little; only a failed start counts.
+  if (code === null) notes.push("Outreach pass could not start");
+}
+
 async function main() {
   mkdirSync(NIGHTLY_DIR, { recursive: true });
   // Another run (e.g. a one-off list) refreshes the lock every job: wait for it, then pick tonight's jobs.
@@ -145,6 +160,11 @@ async function main() {
       const stop = budgetStop();
       if (stop) notes.push(`Skipped the Gmail check: ${stop}.`);
       else await inboxCheck(notes);
+    }
+    if (!dryRun && !flag("no-outreach") && !flag("inbox-only")) {
+      const stop = budgetStop();
+      if (stop) notes.push(`Skipped the outreach pass: ${stop}.`);
+      else await outreachPass(notes);
     }
     if (flag("inbox-only")) return;
 

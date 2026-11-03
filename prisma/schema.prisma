@@ -9,24 +9,24 @@ datasource db {
 
 /// A job/co-op posting — added by hand (WaterlooWorks, a referral, anywhere) or pulled by a source.
 model CoopPosting {
-  id           String    @id @default(cuid())
-  company      String
-  role         String
-  url          String
-  location     String?
-  deadline     DateTime?
-  status       String    @default("open") // open | closed | unknown
-  notes        String    @default("")
+  id       String    @id @default(cuid())
+  company  String
+  role     String
+  url      String
+  location String?
+  deadline DateTime?
+  status   String    @default("open") // open | closed | unknown
+  notes    String    @default("")
 
-  origin       String    @default("manual") // manual | fetched
-  sourceKey    String?
-  externalKey  String?
+  origin      String  @default("manual") // manual | fetched
+  sourceKey   String?
+  externalKey String?
 
   // Normalized facets, filled from the source (or inferred from title/location) so the Jobs page can filter.
-  terms        String[]  @default([]) // UW-style term codes: F26 | W27 | S27 …
-  category     String? // software | hardware | ai_data | quant | product | other
-  region       String? // canada | remote | us | intl
-  postedAt     DateTime?
+  terms    String[]  @default([]) // UW-style term codes: F26 | W27 | S27 …
+  category String? // software | hardware | ai_data | quant | product | other
+  region   String? // canada | remote | us | intl
+  postedAt DateTime?
 
   // Cross-source dedupe: the same job listed by Simplify, the Canadian list, and the company's own
   // board collapses onto one canonical row; the others point at it via duplicateOfId and stay hidden.
@@ -36,11 +36,11 @@ model CoopPosting {
   duplicateOf   CoopPosting?  @relation("PostingDuplicates", fields: [duplicateOfId], references: [id], onDelete: SetNull)
   duplicates    CoopPosting[] @relation("PostingDuplicates")
 
-  firstSeenAt    DateTime  @default(now())
-  lastSeenAt     DateTime?
-  missCount      Int       @default(0)
-  disappearedAt  DateTime?
-  dismissedAt    DateTime?
+  firstSeenAt   DateTime  @default(now())
+  lastSeenAt    DateTime?
+  missCount     Int       @default(0)
+  disappearedAt DateTime?
+  dismissedAt   DateTime?
 
   // The posting's own text, read from the ATS (lib/details), so the app can tell who a job is for.
   details       String?
@@ -53,8 +53,8 @@ model CoopPosting {
   fitReasons String[] @default([]) // "+Spring '27", "-Juniors and seniors"
   flags      String[] @default([]) // see FLAG_LABELS in lib/fit/requirements.ts
 
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   saved  SavedItem?
   source CompanySource? @relation(fields: [sourceKey], references: [key], onDelete: SetNull)
@@ -91,19 +91,19 @@ model Organization {
   sortOrder         Int       @default(0)
 
   // Where the row came from: "seed" (data/*.json) or "mlh" (auto-imported hackathon list).
-  origin            String    @default("seed")
-  location          String?
-  region            String? // nearby | canada | online | us
-  online            Boolean   @default(false)
+  origin   String  @default("seed")
+  location String?
+  region   String? // nearby | canada | online | us
+  online   Boolean @default(false)
 
   // Daily site watcher (lib/watch) — null means "never scanned".
-  watchLevel        String? // none | soon | open
-  watchYear         Int?
-  watchedAt         DateTime?
-  watchError        String?
-  signal            String?
-  signalAt          DateTime?
-  signalSeenAt      DateTime?
+  watchLevel   String? // none | soon | open
+  watchYear    Int?
+  watchedAt    DateTime?
+  watchError   String?
+  signal       String?
+  signalAt     DateTime?
+  signalSeenAt DateTime?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -116,13 +116,13 @@ model Organization {
 
 /// An application you're tracking — for a posting or an org (design team / club / hackathon).
 model SavedItem {
-  id        String    @id @default(cuid())
-  category  String // coop | design_team | club | hackathon
+  id              String    @id @default(cuid())
+  category        String // coop | design_team | club | hackathon
   // interested | applied | oa | interview | offer | accepted | rejected | ghosted | withdrawn | attended
-  status    String    @default("interested")
-  pinned    Boolean   @default(true)
-  appliedAt DateTime?
-  statusChangedAt DateTime @default(now())
+  status          String    @default("interested")
+  pinned          Boolean   @default(true)
+  appliedAt       DateTime?
+  statusChangedAt DateTime  @default(now())
 
   term       String? // UW term this is for, e.g. "W27"
   channel    String? // waterlooworks | direct | referral | other
@@ -189,16 +189,16 @@ model Contact {
 
 /// One academic or work term in your degree — the five-year "journey" timeline.
 model Term {
-  id       String  @id @default(cuid())
-  code     String  @unique // F25 | W26 | S26 …
-  kind     String  @default("study") // study | work | off
-  label    String  @default("") // "1A", "Work term 2", …
-  company  String  @default("")
-  role     String  @default("")
-  location String  @default("")
-  pay      String  @default("")
+  id       String @id @default(cuid())
+  code     String @unique // F25 | W26 | S26 …
+  kind     String @default("study") // study | work | off
+  label    String @default("") // "1A", "Work term 2", …
+  company  String @default("")
+  role     String @default("")
+  location String @default("")
+  pay      String @default("")
   rating   Int? // 1–5, how much you liked it
-  notes    String  @default("")
+  notes    String @default("")
 
   savedItemId String?    @unique
   savedItem   SavedItem? @relation(fields: [savedItemId], references: [id], onDelete: SetNull)
@@ -208,12 +208,12 @@ model Term {
 }
 
 model CompanySource {
-  key      String  @id
-  name     String
-  careerUrl String
-  adapter  String // greenhouse | lever | ashby | workday | smartrecruiters | simplify | markdown-table | generic-css | generic-json
-  configJson String @default("{}")
-  enabled  Boolean @default(true)
+  key        String  @id
+  name       String
+  careerUrl  String
+  adapter    String // greenhouse | lever | ashby | workday | smartrecruiters | simplify | markdown-table | generic-css | generic-json
+  configJson String  @default("{}")
+  enabled    Boolean @default(true)
 
   lastRunAt        DateTime?
   lastOkAt         DateTime?
@@ -255,4 +255,39 @@ model Setting {
   key       String   @id
   value     String
   updatedAt DateTime @updatedAt
+}
+
+/// A cold email to a founder or small company (part-time / co-op roles that aren't posted anywhere).
+model OutreachEmail {
+  id             String    @id @default(cuid())
+  company        String
+  about          String    @default("") // one line: what the company does
+  location       String    @default("") // "Toronto, YC W26, 2 people"
+  contactName    String    @default("")
+  contactInfo    String    @default("") // where to reach them (public routes only)
+  email          String    @default("")
+  resume         String    @default("software") // software | hardware | pm
+  subject        String    @default("")
+  body           String    @default("")
+  notes          String    @default("")
+  status         String    @default("draft") // todo | draft | sent | followed_up | replied | passed
+  tier           String    @default("") // "1 Waterloo founder", "2 Canada based", ...
+  batch          String    @default("") // sending batch: "1", "2", "3", ...
+  emailCheck     String    @default("none") // none | guess | weak | valid | catch_all | bounced
+  linkedin       String    @default("") // profile handle
+  linkedinStatus String    @default("none") // none | requested | connected
+  sentAt         DateTime?
+  followUpAt     DateTime?
+  // Nightly research (scripts/outreach.ts): drafts only, Owen verifies before using any of it.
+  hook           String    @default("") // a specific opener tied to the product
+  proofTitle     String    @default("") // title of the small proof-of-work doc
+  proofDoc       String    @default("") // the doc itself (markdown)
+  proofUrl       String    @default("") // where Owen published it (gist etc.)
+  followUpBody   String    @default("") // the one follow-up, with something new
+  researchedAt   DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status, followUpAt])
 }

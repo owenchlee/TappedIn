@@ -1,0 +1,6 @@
+-- AlterTable
+ALTER TABLE "OutreachEmail" ADD COLUMN "tier" TEXT NOT NULL DEFAULT '',
+ADD COLUMN "batch" TEXT NOT NULL DEFAULT '',
+ADD COLUMN "emailCheck" TEXT NOT NULL DEFAULT 'none',
+ADD COLUMN "linkedin" TEXT NOT NULL DEFAULT '',
+ADD COLUMN "linkedinStatus" TEXT NOT NULL DEFAULT 'none';

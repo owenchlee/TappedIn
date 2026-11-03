@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { SectionTitle } from "@/components/ui/PageHeader";
 import { FitScore } from "@/components/jobs/FitSummary";
-import { finishPrefill, markAutoApplySubmitted, openApplyFolder, prefillStatus, skipQueuedJob, stageApplyFiles, startPrefill, verifyPrefill } from "@/actions/apply";
+import { answerQuestions, finishPrefill, markAutoApplySubmitted, openApplyFolder, prefillStatus, skipQueuedJob, stageApplyFiles, startPrefill, verifyPrefill } from "@/actions/apply";
 import type { PrefillView } from "@/lib/autoapply/prefill";
 import { isThirdParty } from "@/lib/autoapply/source";
 import { RESUME_BASE_LABELS } from "@/lib/autoapply/base";
@@ -25,6 +25,9 @@ export type NightSummary = {
 };
 
 const DAY = 86_400_000;
+/** Jobs per "Process" click: few enough to review and close before the next batch. */
+const PREFILL_BATCH = 3;
+const SUBMIT_BATCH = 3;
 
 function closes(deadline: string | null | undefined): { label: string; urgent: boolean } | null {
   if (!deadline) return null;
@@ -35,7 +38,7 @@ function closes(deadline: string | null | undefined): { label: string; urgent: b
 
 /**
  * One job at a time: open it, attach the staged files, submit, "I applied", next. Keys: O, A, S, C.
- * Or "Process top 10" first: Claude opens and fills those in Chrome tabs, and each card just says to review and submit.
+ * Or "Process top 3" first: Claude opens and fills those in Chrome tabs, and each card just says to review and submit.
  */
 export function ApplyQueue({
   initial,
@@ -66,6 +69,15 @@ export function ApplyQueue({
   const toProcess = queue.filter((j) => !prefill[j.id]).length;
   const toFinish = queue.filter((j) => prefill[j.id]?.state === "needs_you").length;
 
+  // Jobs submitted while this page was closed get logged as applied (prefillStatus does it) and leave the queue.
+  useEffect(() => {
+    if (!Object.values(initialPrefill).some((p) => p?.state === "submitted")) return;
+    void prefillStatus(initial.map((j) => j.id)).then((s) => {
+      setPrefill(s.jobs);
+      setQueue((q) => q.filter((j) => s.jobs[j.id]?.state !== "submitted"));
+    }).catch(() => null);
+  }, [initial, initialPrefill]);
+
   // While a batch is filling, check on it every few seconds; when the last tab is done, say so.
   useEffect(() => {
     if (!processing) return;
@@ -75,7 +87,7 @@ export function ApplyQueue({
       if (!s) return;
       setPrefill(s.jobs);
       // A posting found to be closed leaves the queue.
-      setQueue((q) => q.filter((j) => !s.jobs[j.id]?.closed));
+      setQueue((q) => q.filter((j) => !s.jobs[j.id]?.closed && s.jobs[j.id]?.state !== "submitted"));
       if (s.running) return;
       setProcessing(false);
       if (s.error) {
@@ -84,7 +96,8 @@ export function ApplyQueue({
       }
       const states = Object.values(s.jobs).filter((p) => p?.finishedAt && Date.now() - Date.parse(p.finishedAt) < 3_600_000);
       const ready = states.filter((p) => p?.state === "ready").length;
-      const msg = `${ready} of ${states.length} applications are filled in. Review each Chrome tab and submit.`;
+      const sent = states.filter((p) => p?.state === "submitted").length;
+      const msg = sent ? `${sent} of ${states.length} applications submitted${ready ? `, ${ready} filled and waiting for you` : ""}. Check the others in Chrome.` : `${ready} of ${states.length} applications are filled in. Review each Chrome tab and submit.`;
       setFlash(msg);
       if ("Notification" in window && Notification.permission === "granted") new Notification("Applications ready to review", { body: msg });
     }, 5000);
@@ -104,11 +117,16 @@ export function ApplyQueue({
     [],
   );
 
-  const processTop = useCallback(() => {
+  const [submitMode, setSubmitMode] = useState(false);
+  // "Apply to everything" is running: answering a question can finish its job without waiting for the rest.
+  const [allRun, setAllRun] = useState(false);
+  const processTop = useCallback((submit = false, all = false) => {
     // Ask inside the click, so the browser shows the prompt.
     if ("Notification" in window && Notification.permission === "default") void Notification.requestPermission();
     run(async () => {
-      const ids = await startPrefill(10);
+      const ids = await startPrefill(all ? 300 : submit ? SUBMIT_BATCH : PREFILL_BATCH, submit, all);
+      setSubmitMode(submit);
+      setAllRun(all);
       setPrefill((p) => ({ ...p, ...Object.fromEntries(ids.map((id) => [id, { state: "queued" as const }])) }));
       setProcessing(true);
     });
@@ -211,7 +229,7 @@ export function ApplyQueue({
     <div className="space-y-6">
       {night && <NightLine night={night} />}
 
-      {toFinish > 0 && !processing && (
+      {toFinish > 0 && (!processing || allRun) && (
         <Card className="flex flex-wrap items-center gap-3 p-4">
           <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-amber/12 text-amber">
             <Sparkles className="size-4" />
@@ -246,20 +264,35 @@ export function ApplyQueue({
                 <p className="font-medium text-text">Filling applications in Chrome</p>
                 <p className="text-muted">
                   {Object.values(prefill).filter((p) => p && !["queued", "running"].includes(p.state)).length} done of{" "}
-                  {Object.values(prefill).filter(Boolean).length}. You&apos;ll get a notification when they all are. Nothing gets submitted.
+                  {Object.values(prefill).filter(Boolean).length}. You&apos;ll get a notification when they all are. {submitMode ? "Each one is submitted once its checks pass." : "Nothing gets submitted."}
                 </p>
               </>
             ) : (
               <>
-                <p className="font-medium text-text">Process the next {Math.min(10, toProcess)}</p>
-                <p className="text-muted">Opens each in its own Chrome tab, runs Simplify and attaches the tailored resume, all at once. You review and submit.</p>
+                <p className="font-medium text-text">Process the next {Math.min(PREFILL_BATCH, toProcess)}</p>
+                <p className="text-muted">Opens each in its own Chrome tab, signs up if needed, fills everything and attaches the tailored resume. Fill leaves the submit to you; Apply for me submits each one once its checks pass.</p>
               </>
             )}
           </div>
           {!processing && (
-            <Button disabled={isPending} onClick={processTop}>
-              <Sparkles /> Process top {Math.min(10, toProcess)}
-            </Button>
+            <>
+              <Button variant="secondary" disabled={isPending} onClick={() => processTop(false)}>
+                <Sparkles /> Fill top {Math.min(PREFILL_BATCH, toProcess)}
+              </Button>
+              <Button disabled={isPending} onClick={() => processTop(true)}>
+                <Sparkles /> Apply for me: top {Math.min(SUBMIT_BATCH, toProcess)}
+              </Button>
+              <Button
+                variant="secondary"
+                disabled={isPending}
+                title="Applies to every job in the queue, in order. A job with a question you need to answer doesn't hold the others up."
+                onClick={() => {
+                  if (window.confirm(`Apply to all ${toProcess} jobs in the queue now? Each is submitted once its checks pass. A job with a question for you gets set aside, you get a notification, and the rest keep going.`)) processTop(true, true);
+                }}
+              >
+                <Sparkles /> Apply to all {toProcess}
+              </Button>
+            </>
           )}
         </Card>
       )}
@@ -304,6 +337,20 @@ export function ApplyQueue({
           </div>
 
           {pf && <PrefillLine p={pf} />}
+          {pf?.questions?.length && !processing ? (
+            <QuestionForm
+              questions={pf.questions}
+              disabled={isPending}
+              onSave={(answers) =>
+                run(async () => {
+                  await answerQuestions(job.id, answers);
+                  const ids = await finishPrefill([job.id]);
+                  setPrefill((p) => ({ ...p, ...Object.fromEntries(ids.map((id) => [id, { ...p[id], questions: undefined, state: "queued" as const, note: "Finishing with your answers" }])) }));
+                  setProcessing(true);
+                })
+              }
+            />
+          ) : null}
           {pf && <ResumeCheckLine p={pf} />}
           {boardOnly && !pf && (
             <p className="flex items-start gap-2 rounded-lg bg-amber/12 px-3 py-2 text-sm text-amber">
@@ -475,6 +522,7 @@ const PREFILL_LOOK: Record<PrefillView["state"], { label: string; className: str
   queued: { label: "Waiting", className: "bg-surface-2 text-muted" },
   running: { label: "Filling", className: "bg-accent/12 text-accent" },
   ready: { label: "Ready to submit", className: "bg-emerald/12 text-emerald" },
+  submitted: { label: "Submitted", className: "bg-emerald/12 text-emerald" },
   needs_you: { label: "Needs you", className: "bg-amber/12 text-amber" },
   failed: { label: "Couldn't fill", className: "bg-overdue/10 text-overdue" },
 };
@@ -506,6 +554,40 @@ function ResumeCheckLine({ p }: { p: PrefillView }) {
         <b>{look.label}.</b> {c.detail}
       </span>
     </p>
+  );
+}
+
+/** Questions the worker wouldn't guess. Answers are saved, so no later application asks them again. */
+function QuestionForm({ questions, disabled, onSave }: { questions: { q: string; options?: string[] }[]; disabled: boolean; onSave: (answers: { q: string; a: string }[]) => void }) {
+  const [vals, setVals] = useState<Record<string, string>>({});
+  return (
+    <form
+      className="space-y-3 rounded-lg bg-amber/12 p-3 text-sm"
+      onSubmit={(e) => {
+        e.preventDefault();
+        onSave(questions.map((x) => ({ q: x.q, a: vals[x.q] ?? "" })));
+      }}
+    >
+      <p className="font-medium text-text">Claude needs your answer{questions.length > 1 ? "s" : ""}. Saved for every future application.</p>
+      {questions.map((x) => (
+        <label key={x.q} className="block space-y-1">
+          <span className="text-text">{x.q}</span>
+          {x.options?.length ? (
+            <select className="w-full rounded-md border border-border bg-surface px-2 py-1.5" value={vals[x.q] ?? ""} onChange={(e) => setVals((v) => ({ ...v, [x.q]: e.target.value }))}>
+              <option value="">Choose…</option>
+              {x.options.map((o) => (
+                <option key={o}>{o}</option>
+              ))}
+            </select>
+          ) : (
+            <input className="w-full rounded-md border border-border bg-surface px-2 py-1.5" value={vals[x.q] ?? ""} onChange={(e) => setVals((v) => ({ ...v, [x.q]: e.target.value }))} />
+          )}
+        </label>
+      ))}
+      <Button type="submit" disabled={disabled || questions.some((x) => !(vals[x.q] ?? "").trim())}>
+        <Sparkles /> Save and finish
+      </Button>
+    </form>
   );
 }
 

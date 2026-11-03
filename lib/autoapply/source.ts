@@ -125,3 +125,24 @@ export async function findRealSource(job: { url: string; company: string; role: 
   if (gone) return { url: null, likelyClosed: true, how: "csjobs.ca dropped the listing and it isn't on a public job board; may be closed" };
   return { url: null, how: `not on a public job board; ${link !== job.url ? `the listing points to ${link}` : "needs a search"}` };
 }
+
+/**
+ * One plain HTTP fetch of the employer's posting before a worker is started. Catches the jobs that would
+ * only burn a Chrome run: the page is gone (404/410), or its text names a different term and never Summer 2027.
+ * Conservative: single-page apps that render client-side show no text, and those just go through to the worker.
+ */
+export async function checkPosting(url: string, termConfirmed?: boolean): Promise<{ skip: false } | { skip: true; closed: boolean; note: string }> {
+  try {
+    const res = await fetch(url, { headers: { "user-agent": UA, accept: "text/html" }, redirect: "follow", signal: AbortSignal.timeout(10_000) });
+    if (res.status === 404 || res.status === 410) return { skip: true, closed: true, note: `The employer's posting returns ${res.status}: it's gone.` };
+    if (!res.ok) return { skip: false };
+    const text = (await res.text()).replace(new RegExp("<script[^]*?</script>|<style[^]*?</style>|<[^>]+>", "g"), " ");
+    if (!termConfirmed && !/summer[^a-z0-9]{1,3}2027|(^|[^a-z0-9])s27([^a-z0-9]|$)/i.test(text)) {
+      const other = text.match(/(winter|fall|spring)[^a-z0-9]{1,3}(2027|2026)([^a-z0-9]|$)|summer[^a-z0-9]{1,3}2026/i);
+      if (other) return { skip: true, closed: false, note: `The posting is for ${other[0].replace(/[^a-z0-9]+/gi, " ").trim()}, not Summer 2027. Skipped before opening Chrome.` };
+    }
+  } catch {
+    // network trouble: let the worker look
+  }
+  return { skip: false };
+}

@@ -31,6 +31,8 @@ export type Job = {
   applyUrlNote?: string;
   /** The employer took the posting down; it leaves the queue. */
   closedAt?: string;
+  /** Owen confirmed the posting is for Summer 2027 even if its page shows another term (stale). The submit gate skips the term check. */
+  termConfirmed?: boolean;
   /** The posting's region (canada | remote | us | intl) when it came from the Jobs list. */
   region?: string | null;
   status: JobStatus;
