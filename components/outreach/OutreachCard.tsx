@@ -16,8 +16,12 @@ import {
   EMAIL_CHECK_LABEL,
   EMAIL_CHECK_SAFE,
   LINKEDIN_LABEL,
+  KIND_LABEL,
   LINKEDIN_STATUSES,
+  OUTREACH_KINDS,
   RESUMES,
+  linkedinNote,
+  linkedinSearches,
   SIGNATURE,
   type EmailCheck,
   type LinkedinStatus,
@@ -49,6 +53,10 @@ export type OutreachData = {
   proofDoc: string;
   proofUrl: string;
   followUpBody: string;
+  kind: string;
+  roleTitle: string;
+  roleUrl: string;
+  contactTitle: string;
 };
 
 function CopyButton({ text, label }: { text: string; label: string }) {
@@ -115,6 +123,28 @@ function OutreachForm({ row, onDone }: { row?: OutreachData; onDone: () => void 
         <label>
           <Label>Where / stage</Label>
           <Input name="location" defaultValue={row?.location} placeholder="Toronto, YC W26, 2 people" />
+        </label>
+        <label>
+          <Label>Type</Label>
+          <Select name="kind" defaultValue={row?.kind ?? "founder"} className="w-full">
+            {OUTREACH_KINDS.map((k) => (
+              <option key={k} value={k}>
+                {KIND_LABEL[k]}
+              </option>
+            ))}
+          </Select>
+        </label>
+        <label>
+          <Label>Their title</Label>
+          <Input name="contactTitle" defaultValue={row?.contactTitle} placeholder="University recruiter" />
+        </label>
+        <label>
+          <Label>Role applying for</Label>
+          <Input name="roleTitle" defaultValue={row?.roleTitle} />
+        </label>
+        <label>
+          <Label>Role link</Label>
+          <Input name="roleUrl" defaultValue={row?.roleUrl} />
         </label>
       </div>
       <div className="grid grid-cols-2 gap-3">
@@ -239,6 +269,8 @@ export function OutreachCard({ row }: { row: OutreachData }) {
     ? `https://outlook.office.com/mail/deeplink/compose?to=${encodeURIComponent(row.email)}&subject=${encodeURIComponent(followUpSubject)}&body=${encodeURIComponent(row.followUpBody)}`
     : "";
   const [showMore, setShowMore] = useState(false);
+  const note = linkedinNote(row);
+  const hasEmail = row.kind === "founder" || !!row.email;
 
   return (
     <Card urgency={due ? (follow as "overdue" | "today") : "none"} className="flex flex-col gap-3">
@@ -261,7 +293,25 @@ export function OutreachCard({ row }: { row: OutreachData }) {
       </div>
 
       <div className="text-sm">
-        {row.contactName && <p className="font-medium">{row.contactName}</p>}
+        {row.contactName && (
+          <p className="font-medium">
+            {row.contactName}
+            {row.contactTitle && <span className="font-normal text-muted"> · {row.contactTitle}</span>}
+          </p>
+        )}
+        {!row.contactName && row.contactTitle && <p className="text-xs text-muted">{row.contactTitle}</p>}
+        {row.roleTitle && (
+          <p className="text-xs text-muted">
+            Role:{" "}
+            {row.roleUrl ? (
+              <a href={row.roleUrl} target="_blank" rel="noopener noreferrer" className="text-accent hover:underline">
+                {row.roleTitle}
+              </a>
+            ) : (
+              row.roleTitle
+            )}
+          </p>
+        )}
         {row.contactInfo && <p className="text-xs whitespace-pre-wrap text-muted">{row.contactInfo}</p>}
         {row.email && (
           <p className="flex flex-wrap items-center gap-1.5 font-mono text-xs text-muted">
@@ -271,16 +321,18 @@ export function OutreachCard({ row }: { row: OutreachData }) {
             </Badge>
           </p>
         )}
-        {row.linkedin && (
+        {(row.linkedin || row.kind !== "founder") && (
           <p className="flex flex-wrap items-center gap-1.5 text-xs text-muted">
-            <a
-              href={`https://www.linkedin.com/in/${row.linkedin}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-accent hover:underline"
-            >
-              linkedin.com/in/{row.linkedin}
-            </a>
+            {row.linkedin && (
+              <a
+                href={`https://www.linkedin.com/in/${row.linkedin}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-accent hover:underline"
+              >
+                linkedin.com/in/{row.linkedin}
+              </a>
+            )}
             <button
               type="button"
               disabled={isPending}
@@ -293,17 +345,42 @@ export function OutreachCard({ row }: { row: OutreachData }) {
         )}
       </div>
 
-      <div>
-        <p className="text-xs font-medium text-muted-2">Subject</p>
-        <p className="text-sm">{row.subject || "—"}</p>
-      </div>
+      {row.kind !== "founder" && (
+        <div className="rounded-lg bg-surface-2 p-3 text-sm">
+          <p className="text-xs font-medium text-muted-2">LinkedIn note ({note.length}/300)</p>
+          <p className="mt-1 whitespace-pre-wrap">{note}</p>
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            <CopyButton text={note} label="Note" />
+            {linkedinSearches(row.company).map((s) => (
+              <a
+                key={s.label}
+                href={s.href}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex h-7 items-center rounded-full bg-surface px-2.5 text-xs font-medium text-text shadow-card ring-1 ring-border-strong ring-inset hover:bg-surface-2"
+              >
+                {s.label}
+              </a>
+            ))}
+          </div>
+        </div>
+      )}
 
-      <div>
-        <button type="button" onClick={() => setOpen(!open)} className="text-xs font-medium text-accent hover:underline">
-          {open ? "Hide email" : "Show email"}
-        </button>
-        {open && <p className="mt-2 rounded-lg bg-surface-2 p-3 text-sm whitespace-pre-wrap">{row.body}</p>}
-      </div>
+      {hasEmail && (
+        <>
+          <div>
+            <p className="text-xs font-medium text-muted-2">Subject</p>
+            <p className="text-sm">{row.subject || "—"}</p>
+          </div>
+
+          <div>
+            <button type="button" onClick={() => setOpen(!open)} className="text-xs font-medium text-accent hover:underline">
+              {open ? "Hide email" : "Show email"}
+            </button>
+            {open && <p className="mt-2 rounded-lg bg-surface-2 p-3 text-sm whitespace-pre-wrap">{row.body}</p>}
+          </div>
+        </>
+      )}
 
       {row.hook && (
         <div className="rounded-lg bg-accent/5 p-3 text-sm ring-1 ring-accent/20 ring-inset">
@@ -358,8 +435,8 @@ export function OutreachCard({ row }: { row: OutreachData }) {
       {row.notes && <p className="text-xs whitespace-pre-wrap text-muted">{row.notes}</p>}
 
       <div className="flex flex-wrap items-center gap-1.5">
-        <CopyButton text={row.subject} label="Subject" />
-        <CopyButton text={row.body} label="Email" />
+        {hasEmail && <CopyButton text={row.subject} label="Subject" />}
+        {hasEmail && <CopyButton text={row.body} label="Email" />}
         {mailto && (
           <a
             href={mailto}

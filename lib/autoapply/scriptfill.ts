@@ -14,9 +14,10 @@ import { runClaude } from "./claude";
 import { atsOf, fillPrompt, formUrl, isCoverLetterField, isResumeField, isTranscriptField, matchOption, parseFillReply, roleOnPage, trimFields, wrongTerm, type FormField } from "./formfill";
 import type { Job } from "./job";
 import { PRIVATE_DIR } from "./job";
+import { fillWorkdayHistory, loadHistory, type History } from "./workday";
 import { checkResume, readAccounts, readAnswerBank, saveAccount, type PendingQuestion, type ReportedResume, type Timing } from "./prefill";
 
-const TRANSCRIPT = path.join(PRIVATE_DIR, "transcript.pdf");
+const TRANSCRIPT = path.join(PRIVATE_DIR, "Owen_Lee_Transcript.pdf");
 
 const PORT = Number(process.env.PREFILL_CDP_PORT) || 9333;
 const CHROME_PATHS = [
@@ -90,6 +91,8 @@ const EXTRACT = String.raw`(() => {
 
   const raw = [...document.querySelectorAll("input, textarea, select, button[aria-haspopup='listbox']")].filter((el) => {
     if (["hidden", "submit", "button", "image", "reset", "file", "search"].includes(el.type)) return false;
+    // Workday's experience lists are filled from the resume (lib/autoapply/workday.ts), not by the model.
+    if (/^(workExperience|education|webAddress|language|skills)-/.test(el.id || "")) return false;
     if (el.tabIndex === -1 && el.type !== "radio" && el.type !== "checkbox") return false;
     if (el.closest("header, nav, footer")) return false;
     return vis(el);
@@ -172,8 +175,21 @@ const EXTRACT = String.raw`(() => {
     const lines = root ? (root.innerText || "").split("\n").map(clean).filter((l) => l && !options.includes(l)) : [];
     fields.push({ key: ids[0], ids, kind: "buttons", label: lines[0] || "", required: !!root && /[✱*]/.test(root.innerText || ""), options });
   }
-  const files = [...document.querySelectorAll("input[type=file]")].map((el) => {
-    const around = [el.id, el.name, el.getAttribute("aria-label"), el.labels && el.labels[0] ? el.labels[0].innerText : "", (el.closest("div, section, fieldset, li") || el.parentElement || {}).innerText || ""];
+  const allFiles = [...document.querySelectorAll("input[type=file]")];
+  // The question ("Please attach a copy of your transcript") often sits a few levels above an input whose own
+  // label is just "Attach": climb until there's real text, but never into a box that holds another upload.
+  const fileQuestion = (el) => {
+    let node = el, best = "";
+    for (let i = 0; i < 8 && node.parentElement && node.parentElement !== document.body; i++) {
+      node = node.parentElement;
+      if (allFiles.some((o) => o !== el && node.contains(o))) break;
+      best = node.innerText || "";
+      if (clean(best.replace(/accepted file types:?[a-z, ]*|attach|upload|drop files here|select files|browse|or|enter manually|dropbox|google drive|max(imum)? file size[^a-z]*/gi, "")).length > 12) break;
+    }
+    return best;
+  };
+  const files = allFiles.map((el) => {
+    const around = [el.id, el.name, el.getAttribute("aria-label"), el.labels && el.labels[0] ? el.labels[0].innerText : "", fileQuestion(el)];
     return { id: tag(el), label: clean(around.join(" ")).slice(0, 240) };
   });
   return JSON.stringify({ fields, files, text: (document.body.innerText || "").slice(0, 30000) });
@@ -228,7 +244,7 @@ async function comboOptions(page: Page, loc: Locator): Promise<string[] | undefi
   try {
     await loc.click({ timeout: 2000 });
     await page.waitForTimeout(250);
-    const seen = [...new Set((await page.locator('[role="option"]:visible, [data-automation-id="promptOption"]:visible').allInnerTexts()).map((s) => s.trim()).filter(Boolean))];
+    const seen = [...new Set((await page.locator('[role="option"]:visible, [data-automation-id="promptOption"]:visible, .cx-select__list-item:visible').allInnerTexts()).map((s) => s.trim()).filter(Boolean))];
     await page.keyboard.press("Escape");
     return seen.length && seen.length <= 60 ? seen : undefined;
   } catch {
@@ -236,11 +252,59 @@ async function comboOptions(page: Page, loc: Locator): Promise<string[] | undefi
   }
 }
 
+/** Owen's city and postal code (set per run from the profile), to pick the right street from an address lookup. */
+let home = { city: "", postal: "" };
+
+/**
+ * An address lookup ("200 University Avenue" exists in a dozen cities): only ever take a suggestion in Owen's city,
+ * typing the city along (and the short street form) until one shows up. Never the first hit; Orillia went in once.
+ */
+async function fillAddress(page: Page, loc: Locator, value: string): Promise<boolean> {
+  const short = value.replace(/\bavenue\b/i, "Ave").replace(/\bstreet\b/i, "St").replace(/\broad\b/i, "Rd").replace(/\bdrive\b/i, "Dr").replace(/\b(west|east|north|south)\b/i, (d) => d[0].toUpperCase());
+  const opts = page.locator('[role="option"]:visible, [data-automation-id="promptOption"]:visible, .cx-select__list-item:visible');
+  for (const q of [`${value} ${home.city}`, `${short} ${home.city}`, value]) {
+    await loc.fill("").catch(() => null);
+    await loc.pressSequentially(q.slice(0, 60), { delay: 20 });
+    await opts.first().waitFor({ timeout: 3500 }).catch(() => null);
+    const texts = (await opts.allInnerTexts().catch(() => [] as string[])).map((s) => s.toUpperCase());
+    const prefix = home.postal.replace(/\s+/g, "").slice(0, 3).toUpperCase();
+    const at = texts.findIndex((t) => home.city && t.includes(home.city.toUpperCase()) && (!prefix || t.includes(prefix) || !/[A-Z]\d[A-Z]/.test(t)));
+    if (at >= 0) {
+      await opts.nth(at).click({ timeout: 3000 });
+      // The pick fills Postal Code, City and Province a few seconds later; let it land before those get looked at.
+      await page.waitForTimeout(4000);
+      return true;
+    }
+  }
+  // No suggestion in his city: leave the street typed as free text rather than a wrong match.
+  await loc.fill(value).catch(() => null);
+  await page.keyboard.press("Escape").catch(() => null);
+  return false;
+}
+
 async function fillCombo(page: Page, loc: Locator, value: string): Promise<boolean> {
+  // Already holds it (an address pick fills Postal Code, City and Province): retyping would only break the pick.
+  const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, "");
+  // The page may still be filling it in from that pick: give it a few seconds before typing over it.
+  for (let i = 0; i < 6; i++) {
+    const now = await loc.inputValue().catch(() => "");
+    if (now && norm(now) === norm(value)) return true;
+    if (now || !(await loc.isDisabled().catch(() => false))) break;
+    await page.waitForTimeout(1000);
+  }
+  if (/postal|zip|city|province|state|region/i.test(await loc.getAttribute("id").catch(() => "") ?? "")) {
+    for (let i = 0; i < 6; i++) {
+      const now = await loc.inputValue().catch(() => "");
+      if (now && norm(now) === norm(value)) return true;
+      await page.waitForTimeout(1000);
+    }
+  }
   await loc.click({ timeout: 3000, force: true });
+  const name = await loc.evaluate((el) => `${el.id} ${(el as HTMLInputElement).labels?.[0]?.innerText ?? ""} ${el.getAttribute("aria-label") ?? ""}`).catch(() => "");
+  if (/address|street/i.test(name) && /^\d+\s/.test(value)) return fillAddress(page, loc, value);
   // A button that opens a list (Workday): nothing to type into, so pick from what it shows.
   if ((await loc.evaluate((el) => el.tagName)) === "BUTTON") {
-    const shown = page.locator('[role="option"]:visible, [data-automation-id="promptOption"]:visible');
+    const shown = page.locator('[role="option"]:visible, [data-automation-id="promptOption"]:visible, .cx-select__list-item:visible');
     await shown.first().waitFor({ timeout: 3500 }).catch(() => null);
     const names = (await shown.allInnerTexts()).map((s) => s.trim());
     const pick = names.findIndex((n) => n === matchOption(names, value));
@@ -252,16 +316,37 @@ async function fillCombo(page: Page, loc: Locator, value: string): Promise<boole
     return true;
   }
   await loc.fill("").catch(() => null);
-  await loc.pressSequentially(value.slice(0, 40), { delay: 15 });
+  await loc.pressSequentially(value.slice(0, 40), { delay: 15, timeout: 6000 }).catch(() => null);
   if (await loc.evaluate((el) => !!el.closest('[data-automation-id*="multiselect" i]'))) {
     await page.keyboard.press("Enter");
     await page.waitForTimeout(700);
     if (await loc.evaluate((el) => !!el.closest('[data-automation-id*="multiselect" i]')?.querySelector('[data-automation-id="selectedItem"]'))) return true;
   }
-  const opts = page.locator('[role="option"]:visible, [data-automation-id="promptOption"]:visible');
+  const opts = page.locator('[role="option"]:visible, [data-automation-id="promptOption"]:visible, .cx-select__list-item:visible');
   await opts.first().waitFor({ timeout: 3500 }).catch(() => null);
-  const texts = (await opts.allInnerTexts()).map((s) => s.trim());
+  // A big search list (every school in the world) shows everything first and narrows a moment later: wait for it.
+  const settle = async () => {
+    let prev = -1;
+    for (let i = 0; i < 8; i++) {
+      const n = await opts.count().catch(() => 0);
+      if (n === prev && n < 60) break;
+      prev = n;
+      await page.waitForTimeout(500);
+    }
+    return (await opts.allInnerTexts().catch(() => [] as string[])).map((s) => s.trim());
+  };
+  let texts = await settle();
   let at = texts.findIndex((t) => t === matchOption(texts, value));
+  // Nothing for the whole name: search by its most telling word ("Waterloo") and look for the full name in that.
+  const key = value.split(/[\s,]+/).filter((w) => w.length > 3 && !/^(university|college|institute|school|the)$/i.test(w)).at(-1);
+  if (at < 0 && key && key.length < value.length) {
+    await loc.fill("").catch(() => null);
+    await loc.pressSequentially(key, { delay: 15, timeout: 6000 }).catch(() => null);
+    await opts.first().waitFor({ timeout: 3500 }).catch(() => null);
+    texts = await settle();
+    at = texts.findIndex((t) => t.toLowerCase() === value.toLowerCase());
+    if (at < 0) at = texts.findIndex((t) => t === matchOption(texts, value));
+  }
   // Searchable lists (a city, a school) return the first hit for what was typed.
   if (at < 0 && texts.length && texts[0].toLowerCase().includes(value.toLowerCase().split(/[ ,]/)[0])) at = 0;
   if (at >= 0) {
@@ -284,6 +369,83 @@ async function fillCombo(page: Page, loc: Locator, value: string): Promise<boole
 }
 
 /** Types one answer into one field. Returns false when the field couldn't take it. */
+const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+
+/**
+ * Forms with "ADD EDUCATION" / "ADD EXPERIENCE" buttons that open a small sub-form per entry (Oracle and the like):
+ * add each entry from the tailored resume. A section that already lists the school or employer is left alone.
+ */
+async function fillAddLists(page: Page, h: History): Promise<string[]> {
+  const notes: string[] = [];
+  const body = async () => (await page.locator("body").innerText().catch(() => "")).toLowerCase();
+  const fresh = async (before: string[]) => {
+    const ids = await page.evaluate((b) => [...document.querySelectorAll("input, textarea, select")].filter((e) => { const r = e.getBoundingClientRect(); return r.width > 1 && r.height > 1 && e.id && !b.includes(e.id); }).map((e) => e.id), before);
+    return (re: RegExp) => ids.find((id) => re.test(id));
+  };
+  const allIds = () => page.evaluate(() => [...document.querySelectorAll("input, textarea, select")].map((e) => e.id).filter(Boolean));
+  const setText = async (id: string | undefined, v: string | undefined) => {
+    if (id && v) await page.locator(`[id="${id}"]`).fill(v, { timeout: 4000 }).catch(() => null);
+  };
+  const setCombo = async (id: string | undefined, v: string | undefined) => {
+    if (id && v) await fillCombo(page, page.locator(`[id="${id}"]`), v).catch(() => false);
+  };
+  const setDate = async (find: (re: RegExp) => string | undefined, key: string, mmYYYY: string | undefined) => {
+    const m = mmYYYY?.match(/^(\d{1,2})\/(\d{4})$/);
+    if (!m) return;
+    await setCombo(find(new RegExp(`^month-${key}`, "i")), MONTHS[Number(m[1]) - 1]);
+    await setCombo(find(new RegExp(`^year-${key}`, "i")), m[2]);
+  };
+  const add = async (label: RegExp, fill: (find: (re: RegExp) => string | undefined) => Promise<void>) => {
+    const before = await allIds();
+    const open = page.getByRole("button", { name: label }).filter({ visible: true }).first();
+    if (!(await open.count())) return false;
+    await open.click({ timeout: 4000 }).catch(() => null);
+    await page.waitForTimeout(2000);
+    const find = await fresh(before);
+    await fill(find);
+    // The sub-form's own button carries the same name ("ADD EDUCATION"): it saves the entry.
+    await page.getByRole("button", { name: label }).filter({ visible: true }).last().click({ timeout: 4000 }).catch(() => null);
+    await page.waitForTimeout(2000);
+    return true;
+  };
+
+  if (await page.getByRole("button", { name: /^add education$/i }).filter({ visible: true }).count()) {
+    for (const e of h.education) {
+      if ((await body()).includes(e.school.toLowerCase())) continue;
+      await add(/^add education$/i, async (find) => {
+        await setCombo(find(/^educationalEstablishment|school/i), e.school);
+        await setText(find(/^major|fieldOfStudy/i), e.field);
+        await setCombo(find(/^degree/i), e.degree);
+        // Some forms show the degree as a row of buttons ("Bachelor's Degree").
+        if (/bachelor/i.test(e.degree)) await page.getByRole("radio", { name: /^bachelor/i }).filter({ visible: true }).last().click({ timeout: 3000 }).catch(() => null);
+        if (process.env.PREFILL_DEBUG) console.log("  [lists] school box:", find(/^educationalEstablishment|school/i), "value:", await page.locator(`[id="${find(/^educationalEstablishment|school/i)}"]`).inputValue().catch(() => "?"));
+        await setDate(find, "startDate", e.from);
+        await setDate(find, "dateAcquired|endDate|graduation", e.to);
+      });
+      if (!(await body()).includes(e.school.toLowerCase())) notes.push(`Education: add ${e.school} by hand`);
+    }
+  }
+  if (await page.getByRole("button", { name: /^add experience$/i }).filter({ visible: true }).count()) {
+    for (const w of h.work) {
+      if ((await body()).includes(w.company.toLowerCase())) continue;
+      await add(/^add experience$/i, async (find) => {
+        await setText(find(/^employerName|company/i), w.company);
+        await setText(find(/^jobTitle|title/i), w.title);
+        await setDate(find, "startDate", w.from);
+        if (w.current) {
+          const cur = find(/current/i);
+          if (cur) await page.locator(`[id="${cur}"]`).check({ force: true, timeout: 2000 }).catch(() => null);
+        } else await setDate(find, "endDate", w.to);
+        await setCombo(find(/^countryCode|country/i), "Canada");
+        await setText(find(/^employerCity|city/i), w.location?.split(",")[0]);
+        await setText(find(/^responsibilities|description/i), w.description);
+      });
+      if (!(await body()).includes(w.company.toLowerCase())) notes.push(`Experience: add ${w.company} by hand`);
+    }
+  }
+  return notes;
+}
+
 async function applyAnswer(page: Page, f: ScriptField, value: string | boolean | string[]): Promise<boolean> {
   const at = (i: number) => page.locator(`[data-tf="${f.ids[i]}"]`);
   const text = Array.isArray(value) ? value.join(", ") : String(value);
@@ -362,8 +524,30 @@ async function navButton(page: Page): Promise<{ kind: "submit" | "next"; loc: Lo
 }
 
 async function clickText(page: Page, re: RegExp): Promise<boolean> {
-  const loc = page.locator('a:visible, button:visible, [role="button"]:visible').filter({ hasText: re }).first();
-  if (!(await loc.count())) return false;
+  // By text, then by accessible name: Oracle's "APPLY NOW" carries hidden text, so the text match misses it.
+  let loc = page.locator('a:visible, button:visible, [role="button"]:visible').filter({ hasText: re }).first();
+  if (!(await loc.count())) loc = page.getByRole("button", { name: re }).filter({ visible: true }).first();
+  if (!(await loc.count())) loc = page.getByRole("link", { name: re }).filter({ visible: true }).first();
+  if (!(await loc.count())) {
+    // Last resort: what the button visibly says (innerText, or its aria-label), matched in the page itself.
+    const found = await page
+      .evaluate(
+        ([src, flags]) => {
+          const r = new RegExp(src, flags);
+          document.querySelectorAll("[data-click]").forEach((e) => e.removeAttribute("data-click"));
+          const el = [...document.querySelectorAll("a, button, [role=button]")].find((e) => {
+            const b = e.getBoundingClientRect();
+            return b.width > 1 && b.height > 1 && (r.test(((e as HTMLElement).innerText || "").trim()) || r.test((e.getAttribute("aria-label") || "").trim()));
+          });
+          el?.setAttribute("data-click", "1");
+          return Boolean(el);
+        },
+        [re.source, re.flags] as const,
+      )
+      .catch(() => false);
+    if (!found) return false;
+    loc = page.locator('[data-click="1"]').first();
+  }
   await loc.click({ timeout: 4000, force: true }).catch(() => null);
   await page.waitForLoadState("networkidle", { timeout: 6000 }).catch(() => null);
   await page.waitForTimeout(1200);
@@ -374,7 +558,9 @@ async function clickText(page: Page, re: RegExp): Promise<boolean> {
 async function signIn(page: Page, email: string, touch: () => void): Promise<string | null> {
   const host = new URL(page.url()).hostname;
   const acct = readAccounts().find((a) => a.site === host);
-  const creating = (await page.locator('input[type="password"]:visible').count()) >= 2;
+  // Workday keeps the other screen's boxes in the page, so its own Sign In button decides which screen this is.
+  const onSignIn = (await page.locator('[data-automation-id="signInSubmitButton"]:visible').count()) > 0;
+  const creating = !onSignIn && (await page.locator('input[type="password"]:visible').count()) >= 2;
   if (creating && acct) return (await clickText(page, /^sign in$/i)) ? null : "This site wants a sign-in and I couldn't find the Sign In button.";
   if (!creating && !acct) return (await clickText(page, /^create account$/i)) ? null : `${host} needs an account and I couldn't find where to make one.`;
   const login = { email: acct?.email ?? email, password: acct?.password ?? `Ti${randomBytes(6).toString("hex")}#9a` };
@@ -410,23 +596,97 @@ function profileEmail(profile: string): string {
   }
 }
 
-async function reachForm(page: Page, email: string, touch: () => void): Promise<{ stuck?: string }> {
+/** A screen asking for a code the site emailed or texted ("Confirm your identity", "Enter the 6-digit code"). */
+async function codeScreen(page: Page): Promise<boolean> {
+  const text = await page.locator("body").innerText().catch(() => "");
+  if (!/confirm your identity|verification code|enter the code|one-time (pass)?code|6-digit|we (sent|emailed) (you )?a code|security code/i.test(text)) return false;
+  return (await page.locator('input:visible:not([type="hidden"]):not([type="checkbox"]):not([type="radio"])').count()) > 0;
+}
+
+/**
+ * Owen types the code himself (reading his inbox and signing in for him is off-limits): bring the tab up, tell him,
+ * and wait right here, up to 15 minutes, for the page to move past the code screen. Other jobs keep going meanwhile.
+ */
+async function waitForCode(page: Page, waitForYou?: (why: string) => void): Promise<boolean> {
+  await page.bringToFront().catch(() => null);
+  waitForYou?.(`${new URL(page.url()).hostname} emailed you a code. Type it into its tab in the fill window; this job carries on by itself.`);
+  for (let i = 0; i < 300; i++) {
+    await page.waitForTimeout(3000);
+    if (!(await codeScreen(page))) return true;
+  }
+  return false;
+}
+
+async function reachForm(page: Page, email: string, touch: () => void, waitForYou?: (why: string) => void): Promise<{ stuck?: string }> {
   // A cookie banner sits over the Apply button on some sites.
   await page.getByText(/^(accept cookies|accept all cookies|accept all|accept)$/i).first().click({ timeout: 1500 }).catch(() => null);
   for (let i = 0; i < 6; i++) {
-    if (process.env.PREFILL_DEBUG) console.log("  [gate]", i, page.url().slice(0, 100));
+    // "Get started with just your email" (Oracle and the like): type it, tick the terms, Next. A code screen follows.
+    const emailOnly = page.locator('input[type="email"]:visible, input[name*="email" i]:visible, input[aria-label*="email" i]:visible').first();
+    const fieldsHere = await page.locator('input:visible:not([type="hidden"]):not([type="checkbox"]), textarea:visible, select:visible').count();
+    if (!(await codeScreen(page)) && fieldsHere <= 2 && (await emailOnly.count()) && !(await page.locator('input[type="password"]:visible').count())) {
+      touch();
+      await emailOnly.fill(email, { timeout: 4000 }).catch(() => null);
+      // The terms box is often drawn over a zero-size input: tick it, else click its label.
+      const boxes = page.locator('input[type="checkbox"]');
+      for (let b = 0; b < (await boxes.count()); b++) {
+        const box = boxes.nth(b);
+        if (await box.isChecked().catch(() => true)) continue;
+        await box.check({ force: true, timeout: 2000 }).catch(() => null);
+        const id = await box.getAttribute("id").catch(() => null);
+        if (!(await box.isChecked().catch(() => true)) && id) await page.locator(`label[for="${id}"]`).first().click({ timeout: 2000 }).catch(() => null);
+        if (!(await box.isChecked().catch(() => true))) await box.evaluate((el) => (el as HTMLInputElement).click()).catch(() => null);
+      }
+      // Ticking it can open the terms in a window with its own "Agree" button (Oracle does): press it.
+      await clickText(page, /^(agree|i agree|accept|i accept)$/i);
+      for (let b = 0; b < (await boxes.count()); b++) {
+        const box = boxes.nth(b);
+        if (!(await box.isChecked().catch(() => true))) await box.evaluate((el) => (el as HTMLInputElement).click()).catch(() => null);
+      }
+      if (process.env.PREFILL_DEBUG) console.log("  [gate] email screen, terms ticked:", await boxes.first().isChecked().catch(() => null));
+      if (!(await clickText(page, /^(next|continue|submit)$/i))) return { stuck: "couldn't get past the email screen" };
+      await page.waitForTimeout(2500);
+      continue;
+    }
+    if (await codeScreen(page)) {
+      touch();
+      if (!(await waitForCode(page, waitForYou))) return { stuck: "The site's emailed code wasn't entered within 15 minutes. Type it into the tab, then hit Finish." };
+      await page.waitForTimeout(2000);
+      continue;
+    }
+    if (process.env.PREFILL_DEBUG) console.log("  [gate]", i, page.url().slice(-50), "| pw", await page.locator('input[type="password"]:visible').count(), "|", (await page.locator("body").innerText().catch(() => "")).slice(-260).split("\n").join(" "));
     if (await page.locator('input[type="password"]:visible').count()) {
+      // A brand-new account lands back here until the link in its welcome email is clicked.
+      if (/email has been sent|verify your account/i.test(await page.locator("body").innerText().catch(() => ""))) {
+        touch();
+        return { stuck: `Made an account on ${new URL(page.url()).hostname}. It emailed a verification link to ${email}: click it, then hit Finish.` };
+      }
       const why = await signIn(page, email, touch);
       if (why) return { stuck: why };
       continue;
     }
     const inputs = await page.locator('input:visible:not([type="hidden"]):not([type="search"]), textarea:visible, select:visible').count();
     if ((await page.locator('input[type="file"]').count()) || inputs >= 3) return {};
+    // Workday sometimes shows "Something went wrong. Please refresh the page": refresh, as it says.
+    if (/something went wrong|please refresh the page/i.test(await page.locator("body").innerText().catch(() => ""))) {
+      await page.reload({ waitUntil: "domcontentloaded" }).catch(() => null);
+      await page.waitForTimeout(3000);
+      continue;
+    }
+    // Workday and the like draw the page a few seconds after it loads: keep looking before calling it stuck.
     let moved = false;
-    for (const re of [/^apply manually$/i, /^sign in with email$/i, /^(continue application|start your application|start application|apply now|apply for this job|apply)$/i]) {
-      if (await clickText(page, re)) {
+    for (let wait = 0; wait < 20 && !moved; wait++) {
+      if (wait) await page.waitForTimeout(500);
+      const fields = page.locator('input:visible:not([type="hidden"]):not([type="search"]), textarea:visible, select:visible');
+      if ((await fields.count()) >= 3 || (await page.locator('input[type="password"]:visible').count())) {
         moved = true;
         break;
+      }
+      for (const re of [/^apply manually$/i, /^sign in with email$/i, /^(continue application|start your application|start application|apply now|apply for this job|apply)$/i]) {
+        if (await clickText(page, re)) {
+          moved = true;
+          break;
+        }
       }
     }
     if (!moved) return { stuck: "couldn't find the application form or an Apply button" };
@@ -438,7 +698,7 @@ const CLOSED = /no longer (accepting|available|open)|position (has been |is )?(f
 
 export async function scriptFill(
   job: Job,
-  o: { resume: string; coverLetter?: string; profile: string; experience: string; model: string; submit?: { resumeSize: number }; cwd: string },
+  o: { resume: string; coverLetter?: string; profile: string; experience: string; model: string; submit?: { resumeSize: number }; cwd: string; waitForYou?: (why: string) => void },
 ): Promise<ScriptResult> {
   const ats = atsOf(job.applyUrl);
   if (!job.applyUrl) return { fallback: true, why: "no application URL" };
@@ -450,11 +710,29 @@ export async function scriptFill(
 
   let context: BrowserContext;
   let page: Page;
+  let reused = false;
   try {
     context = (await connect()).contexts()[0];
-    const here = (u: string) => u.split("?")[0].replace(/[/]+$/, "").replace(/[/](apply|application)$/, "");
-    for (const old of context.pages()) if (here(old.url()) === here(job.applyUrl)) await old.close().catch(() => null);
-    page = await context.newPage();
+    // The same posting's tab, however the site rewrote its address since (Workday adds /en-US/ and /apply/..., Oracle
+    // keeps the job in the #hash, a sign-in page keeps it in ?redirect=): same host and the same posting number.
+    const here = (u: string) => {
+      try {
+        const url = new URL(u);
+        const all = decodeURIComponent(url.pathname + url.hash + url.search);
+        const id = all.match(/[0-9]{4,}/)?.[0];
+        const parts = decodeURIComponent(url.pathname).split("/").filter((s) => s && !/^(apply|application|applymanually|autofillwithresume|useMyLastApplication|en-us|login)$/i.test(s));
+        return `${url.hostname}|${id ?? (parts.at(-1) ?? "").toLowerCase().replace(/[^a-z0-9]+/g, "")}`;
+      } catch {
+        return u;
+      }
+    };
+    // Sites with a sign-in (Workday, Oracle...) keep it in the open tab: carry on in that tab instead of closing it,
+    // or Owen gets signed out and asked for another emailed code. The three plain ATSs start from a fresh form.
+    const olds = context.pages().filter((p) => here(p.url()) === here(job.applyUrl ?? ""));
+    const keep = ats ? undefined : olds.pop();
+    for (const old of olds) await old.close().catch(() => null);
+    page = keep ?? (await context.newPage());
+    reused = Boolean(keep);
   } catch (err) {
     return { fallback: true, why: `couldn't start the script's Chrome (${err instanceof Error ? err.message : err})` };
   }
@@ -466,7 +744,9 @@ export async function scriptFill(
 
   try {
     let t = Date.now();
-    await page.goto(ats ? formUrl(ats, job.applyUrl) : job.applyUrl, { waitUntil: "domcontentloaded", timeout: 30_000 });
+    // A reused tab already inside the application stays where it is (going back to the posting can restart it).
+    if (reused && /apply|application|candidate|section/i.test(page.url())) await page.bringToFront().catch(() => null);
+    else await page.goto(ats ? formUrl(ats, job.applyUrl) : job.applyUrl, { waitUntil: "domcontentloaded", timeout: 30_000 });
     await page.waitForLoadState("networkidle", { timeout: 8000 }).catch(() => null);
     if (ats === "greenhouse" && !(await page.locator("input[type=file]").count())) {
       await page.locator('a:has-text("Apply"), button:has-text("Apply")').first().click({ timeout: 3000 }).catch(() => null);
@@ -476,7 +756,7 @@ export async function scriptFill(
 
     // Get to the form itself: click through an "Apply" landing page, sign in (or make an account) when asked.
     t = Date.now();
-    const gate = await reachForm(page, profileEmail(o.profile), () => (touched = true));
+    const gate = await reachForm(page, profileEmail(o.profile), () => (touched = true), o.waitForYou);
     lap("gate", t);
     if (gate.stuck) {
       if (!touched) return await give(gate.stuck);
@@ -505,6 +785,13 @@ export async function scriptFill(
     let pages = 0;
     let stoppedOn = "";
 
+    try {
+      const pr = JSON.parse(o.profile);
+      home = { city: String(pr.city ?? ""), postal: String(pr.postalCode ?? "") };
+    } catch {
+      home = { city: "", postal: "" };
+    }
+    let samePageAgain = 0;
     for (let step = 0; step < 12; step++) {
       pages++;
       if (step > 0) {
@@ -537,11 +824,58 @@ export async function scriptFill(
         sent = true;
       }
       if (sent) await page.waitForTimeout(ats === "ashby" ? 3500 : 2500);
+      // Workday keeps every file ever uploaded to a draft, with its size: keep one copy of this job's resume
+      // (which also proves it's the right one) and delete the rest, so an old run's resume can't go out.
+      const items = page.locator('[data-automation-id="file-upload-item"]');
+      if (resumeInput && (await items.count())) {
+        const want = `${(expected / 1024).toFixed(2)} KB`;
+        for (let n = 0; n < 8; n++) {
+          const texts = await items.allInnerTexts().catch(() => [] as string[]);
+          const keep = texts.findIndex((x) => x.includes(want));
+          const drop = texts.findIndex((x, i) => i !== keep && /resume|cv/i.test(x) && !/transcript/i.test(x));
+          if (drop < 0) break;
+          await items.nth(drop).locator('[data-automation-id="delete-file"]').click({ force: true, timeout: 3000 }).catch(() => null);
+          await page.waitForTimeout(1200);
+        }
+        if (!(await items.allInnerTexts().catch(() => [] as string[])).some((x) => x.includes(want))) {
+          await page.locator(`[data-tf="${resumeInput.id}"]`).setInputFiles(o.resume).catch(() => null);
+          await page.waitForTimeout(2500);
+        }
+        if ((await items.allInnerTexts().catch(() => [] as string[])).filter((x) => x.includes(want)).length === 1) {
+          uploaded = true;
+          resume = { name: "Owen_Lee_Resume.pdf", size: expected };
+        }
+      }
+      if (process.env.PREFILL_DEBUG) console.log("  [files]", ex.files.map((f) => f.label.slice(-70)), "resume:", resumeInput?.id, "transcript:", transcriptInput?.id);
       lap(`upload${step || ""}`, t);
+
+      // Workday's My Experience: add the work, education, website and skills entries from the tailored resume.
+      t = Date.now();
+      let history = false;
+      if (await page.locator('[aria-labelledby="Work-Experience-section"]').count()) {
+        history = true;
+        let website: string | undefined;
+        try {
+          website = JSON.parse(o.profile).website || undefined;
+        } catch {
+          // no website
+        }
+        const wd = await inFront(page, () => fillWorkdayHistory(page, { jobDir: path.dirname(path.dirname(o.resume)), website, model: o.model, cwd: o.cwd }));
+        costUsd += wd.costUsd;
+        emptyAll.push(...wd.notes);
+      }
+      // Other sites' "ADD EDUCATION" / "ADD EXPERIENCE" buttons (Oracle and the like): same history, one sub-form per entry.
+      if (!history && (await page.getByRole("button", { name: /^add (education|experience)$/i }).filter({ visible: true }).count())) {
+        history = true;
+        const loaded = await loadHistory({ jobDir: path.dirname(path.dirname(o.resume)), model: o.model, cwd: o.cwd });
+        costUsd += loaded.costUsd;
+        if (loaded.h) emptyAll.push(...(await inFront(page, () => fillAddLists(page, loaded.h!))));
+      }
+      lap(`history${step || ""}`, t);
 
       // Read the fields again (an upload can add or change them), and look inside each dropdown for its choices.
       t = Date.now();
-      if (sent || step === 0) ex = JSON.parse((await page.evaluate(EXTRACT)) as string) as Extracted;
+      if (sent || step === 0 || history) ex = JSON.parse((await page.evaluate(EXTRACT)) as string) as Extracted;
       const fields = ex.fields.filter((f) => f.label);
       await inFront(page, async () => {
         for (const f of fields) if (f.kind === "combobox") f.options = await comboOptions(page, page.locator(`[data-tf="${f.key}"]`));
@@ -566,9 +900,27 @@ export async function scriptFill(
       // Type them in.
       t = Date.now();
       await inFront(page, async () => {
+        // Answers are keyed by the field's first tag; a page that rebuilds fields (an address pick redraws Postal Code,
+        // City and Province) drops the tags, so find those fields again by their label before typing.
+        // A phone's country-code box carries the same "Phone Number" label as the number itself, so the model can't
+        // tell them apart: set it to Canada here, and the number field gets the 10 digits.
+        const codeBox = page.locator('input[role="combobox"][id*="country-code" i]:visible').first();
+        if ((await codeBox.count()) && !(await codeBox.inputValue().catch(() => "")).trim()) await fillCombo(page, codeBox, "Canada").catch(() => false);
+        const isCodeBox = async (f: ScriptField) => /country-code/i.test((await page.locator(`[data-tf="${f.ids[0]}"]`).getAttribute("id").catch(() => "")) ?? "");
+        const answerOf = new Map(fields.map((f) => [f, reply!.answers[f.key]]));
+        for (const f of fields) if (f.kind === "combobox" && (await isCodeBox(f))) answerOf.delete(f);
         for (const f of fields) {
-          const v = reply!.answers[f.key];
+          const v = answerOf.get(f);
           if (v === undefined || v === "" || (Array.isArray(v) && !v.length)) continue;
+          if (!(await page.locator(`[data-tf="${f.ids[0]}"]`).count())) {
+            const again = (JSON.parse((await page.evaluate(EXTRACT)) as string) as Extracted).fields;
+            for (const g of fields) {
+              const m = again.find((x) => x.label === g.label && x.kind === g.kind);
+              g.ids = m ? m.ids : [];
+              g.key = m ? m.key : g.key;
+            }
+            if (!f.ids.length) continue;
+          }
           const t1 = Date.now();
           const ok = await applyAnswer(page, f, v);
           if (process.env.PREFILL_DEBUG) console.log(`  [fill] ${ok ? "ok " : "FAIL"} ${Date.now() - t1}ms ${f.kind} "${f.label.slice(0, 50)}" <- ${String(v).slice(0, 40)}`);
@@ -598,6 +950,16 @@ export async function scriptFill(
 
       // Nothing required left empty, and nothing for Owen to answer, on this page.
       const here = (JSON.parse((await page.evaluate(CHECK)) as string) as string[]).filter((l) => l && !reply!.ask.some((k) => fields.find((f) => f.key === k)?.label === l));
+      // Answers can make new fields appear (Country -> Address, Province...). Go over the same page once more for those.
+      const fresh = (JSON.parse((await page.evaluate(EXTRACT)) as string) as Extracted).fields.filter((f) => f.label && !fields.some((g) => g.label === f.label));
+      if (fresh.length && samePageAgain < 3) {
+        samePageAgain++;
+        ex = JSON.parse((await page.evaluate(EXTRACT)) as string) as Extracted;
+        step--;
+        pages--;
+        continue;
+      }
+      samePageAgain = 0;
       emptyAll.push(...here);
       for (const k of reply.ask) {
         const f = fields.find((x) => x.key === k);
@@ -620,11 +982,13 @@ export async function scriptFill(
         await page.waitForTimeout(1500);
       });
       let after = (await page.locator("body").innerText().catch(() => "")).slice(0, 4000);
-      for (let w = 0; w < 16 && after === sig; w++) {
+      for (let w = 0; w < 40 && after === sig; w++) {
         await page.waitForTimeout(500);
         after = (await page.locator("body").innerText().catch(() => "")).slice(0, 4000);
       }
-      const showsErrors = await page.locator('[role="alert"]:visible, [data-automation-id="errorMessage"]:visible, [data-automation-id="errorHeading"]:visible').count();
+      // Workday also announces "Owen_Lee_Resume.pdf successfully uploaded" as an alert: that one isn't an error.
+      const alerts = await page.locator('[role="alert"]:visible, [data-automation-id="errorMessage"]:visible, [data-automation-id="errorHeading"]:visible').allInnerTexts().catch(() => [] as string[]);
+      const showsErrors = alerts.filter((a) => a.trim() && !/successfully|uploaded|saved/i.test(a)).length;
       if (after === sig || showsErrors) {
         const errs = (JSON.parse((await page.evaluate(CHECK)) as string) as string[]).filter(Boolean);
         emptyAll.push(...(errs.length ? errs : ["the page wouldn't move on (check the tab for errors)"]));
@@ -648,6 +1012,9 @@ export async function scriptFill(
     const essayNote = essays ? ` I drafted ${essays} written answer${essays > 1 ? "s" : ""}; read ${essays > 1 ? "them" : "it"}.` : "";
     if (questions.length) return { r: { ...base, state: "needs_you", note: `Filled${stoppedOn || " the rest"}. ${questions.length} question${questions.length > 1 ? "s" : ""} need${questions.length > 1 ? "" : "s"} your answer${missing.length ? `; also still empty: ${missing.slice(0, 4).join("; ")}` : ""}.${essayNote}` }, timing: timing(), costUsd };
     if (missing.length) return { r: { ...base, state: "needs_you", note: `Filled most of it${stoppedOn}. Still empty: ${missing.slice(0, 5).join("; ")}.${essayNote}` }, timing: timing(), costUsd };
+    // The resume can already be attached from an earlier pass (the page lists it by name and the upload box is gone).
+    if (!uploaded && firstText.includes("Owen_Lee_Resume.pdf")) uploaded = true;
+    if (!uploaded && (await page.locator("body").innerText().catch(() => "")).includes("Owen_Lee_Resume.pdf")) uploaded = true;
     if (!uploaded) return { r: { ...base, state: "needs_you", note: `Filled${pageNote}, but I never found a resume upload. Attach it by hand.${essayNote}` }, timing: timing(), costUsd };
 
     if (!o.submit) return { r: { ...base, state: "ready", note: `Filled and the tailored resume is attached.${essayNote} Review and submit.` }, timing: timing(), costUsd };

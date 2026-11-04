@@ -2,6 +2,7 @@ import os from "node:os";
 import path from "node:path";
 import { termSortKey } from "@/lib/terms";
 import type { Job } from "./job";
+import { isThirdParty } from "./source";
 
 // The morning queue: what the nightly batch (scripts/nightly.ts) tailored and Owen hasn't applied to
 // or skipped yet, plus the rules the batch picks jobs by. Pure, so the picker and the queue page
@@ -19,6 +20,8 @@ export function isQueued(job: Job, now = new Date()): boolean {
   // A posting Owen is not allowed to take (U.S. citizens only, clearance, no sponsorship) never shows up.
   if (job.warnings?.length && job.region !== "canada") return false;
   if (!job.batch || job.submittedAt || job.skippedAt || job.closedAt || job.status !== "ready") return false;
+  // Only a job board's link and no employer's one means nowhere to apply, so it stays out until it gets a real link.
+  if (isThirdParty(job.applyUrl ?? job.url)) return false;
   return !job.deadline || Date.parse(job.deadline) > now.getTime() - 12 * HOUR;
 }
 
@@ -29,6 +32,12 @@ export function isQueued(job: Job, now = new Date()): boolean {
  */
 export function queueOrder(jobs: Job[], now = new Date(), roi: (j: Job) => number = (j) => j.fitScore ?? 0): Job[] {
   const soon = (j: Job) => (j.deadline && Date.parse(j.deadline) - now.getTime() < CLOSING_SOON_MS ? Date.parse(j.deadline) : Infinity);
+  // The same posting tailored on two nights is one application: only its first copy in the order stays.
+  const seen = new Set<string>();
+  const once = (j: Job) => {
+    const key = (j.applyUrl ?? j.url).replace(/[?#].*$/, "").replace(/\/+$/, "").toLowerCase();
+    return seen.has(key) ? false : (seen.add(key), true);
+  };
   return jobs
     .filter((j) => isQueued(j, now))
     .sort(
@@ -38,7 +47,8 @@ export function queueOrder(jobs: Job[], now = new Date(), roi: (j: Job) => numbe
         roi(b) - roi(a) ||
         (b.fitScore ?? 0) - (a.fitScore ?? 0) ||
         a.createdAt.localeCompare(b.createdAt),
-    );
+    )
+    .filter(once);
 }
 
 /** Roles a first-year without work experience realistically won't get: senior, research, grad-level. */

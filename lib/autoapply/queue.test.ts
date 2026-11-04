@@ -14,7 +14,7 @@ function job(id: string, extra: Partial<Job> = {}): Job {
     source: { kind: "coop", id },
     company: id,
     role: "Intern",
-    url: "https://example.com",
+    url: `https://example.com/${id}`,
     status: "ready",
     steps: { open: { state: "done" }, tailor: { state: "done" }, cover_letter: { state: "skipped" } },
     batch: "2026-10-05",
@@ -23,7 +23,21 @@ function job(id: string, extra: Partial<Job> = {}): Job {
   };
 }
 
+describe("queueOrder duplicates", () => {
+  it("keeps one copy of a posting tailored twice", () => {
+    const url = "https://jobs.lever.co/acme/1";
+    const out = queueOrder([job("a", { url, fitScore: 50 }), job("b", { url: `${url}/`, fitScore: 80 }), job("c", { fitScore: 10 })], now);
+    expect(out.map((j) => j.id)).toEqual(["b", "c"]);
+  });
+});
+
 describe("isQueued", () => {
+  it("leaves out a job that only has a job board's link", () => {
+    const board = "https://csjobs.ca/jobs/1/intern-at-acme";
+    expect(isQueued(job("a", { url: board }), now)).toBe(false);
+    expect(isQueued(job("b", { url: board, applyUrl: "https://jobs.lever.co/acme/1" }), now)).toBe(true);
+  });
+
   it("only counts nightly jobs that are ready and untouched", () => {
     expect(isQueued(job("a"), now)).toBe(true);
     expect(isQueued(job("b", { batch: undefined }), now)).toBe(false);

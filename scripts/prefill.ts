@@ -148,6 +148,12 @@ async function prefillOne(jobId: string) {
       model: process.env.PREFILL_FILL_MODEL || model,
       submit: submitting ? { resumeSize: statSync(resume).size } : undefined,
       cwd: jobDir(jobId),
+      // A code only Owen can type: say so on the queue and with a notification, then the script waits in the tab.
+      waitForYou: (why) => {
+        set(jobId, { note: why });
+        notify(`${job.company} needs the code from your email`, why);
+        say(`${job.company}: waiting for Owen to type the emailed code`);
+      },
     });
     if (sf.fallback) {
       say(`${job.company}: script passed (${sf.why}); using the Chrome worker`);
@@ -159,7 +165,9 @@ async function prefillOne(jobId: string) {
   }
   if (!r) {
     if (!(await chromeReady())) {
-      set(jobId, { state: "failed", note: CHROME_DOWN, finishedAt: new Date().toISOString() });
+      // Only this job is held back: the rest of the run carries on, and Finish retries it once Chrome is back.
+      set(jobId, { state: "needs_you", note: `This one needs the Chrome worker. ${CHROME_DOWN}`, url: job.applyUrl, finishedAt: new Date().toISOString() });
+      say(`${job.company}: needs the Chrome worker, which isn't connected`);
       return;
     }
     ({ run, r } = await attempt(resumeUrl));
@@ -239,15 +247,11 @@ async function main() {
   if (!ids.length) throw new Error("Usage: tsx scripts/prefill.ts <jobId> [<jobId> ...]");
   writeFileSync(PREFILL_LOCK, String(process.pid));
   rmSync(PREFILL_ERROR, { force: true });
-  // One cheap check first, so ten workers don't each pay to find Chrome isn't connected. Jobs the script fills
-  // don't use the extension at all, so a batch of only those skips the check (a fallback checks when it needs to).
-  const needsWorker = resuming || verifying || ids.some((id) => { const j = readJob(id); return !j || !scriptOn || !scriptable(j); });
-  if (needsWorker) {
+  // --resume and --verify always use the extension, so they check first and leave their jobs as they were. A normal
+  // fill never stops here: most jobs don't touch the extension, and one that does finds out in prefillOne.
+  if (resuming || verifying) {
     const check = await chromeCheck();
     if (!check.ok) {
-      // Nothing was tried, so these jobs stay up for the next Process click.
-      // (A resume leaves them as they were: still "needs you", ready for another Finish.)
-      if (!resuming && !verifying) for (const id of ids) rmSync(path.join(jobDir(id), "prefill.json"), { force: true });
       writeFileSync(PREFILL_ERROR, CHROME_DOWN);
       notify("Couldn't start filling applications", CHROME_DOWN);
       say(`✗ ${CHROME_DOWN} (${check.detail})`);

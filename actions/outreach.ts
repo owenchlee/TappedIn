@@ -7,6 +7,7 @@ import {
   EMAIL_CHECKS,
   FOLLOW_UP_DAYS,
   LINKEDIN_STATUSES,
+  OUTREACH_KINDS,
   OUTREACH_STATUSES,
   RESUMES,
   type LinkedinStatus,
@@ -36,6 +37,10 @@ const schema = z.object({
   proofDoc: z.string().trim().max(8000).default(""),
   proofUrl: z.string().trim().max(500).default(""),
   followUpBody: z.string().trim().max(3000).default(""),
+  kind: z.enum(OUTREACH_KINDS).default("founder"),
+  roleTitle: z.string().trim().max(300).default(""),
+  roleUrl: z.string().trim().max(600).default(""),
+  contactTitle: z.string().trim().max(200).default(""),
 });
 
 export async function saveOutreach(id: string | null, formData: FormData): Promise<OutreachResult> {

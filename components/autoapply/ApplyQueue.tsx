@@ -65,6 +65,7 @@ export function ApplyQueue({
   const job = queue.at(0);
   const [prefill, setPrefill] = useState(initialPrefill);
   const [processing, setProcessing] = useState(prefillRunning);
+  const [runIds, setRunIds] = useState<string[]>([]);
   const pf = job ? prefill[job.id] : null;
   const toProcess = queue.filter((j) => !prefill[j.id]).length;
   const toFinish = queue.filter((j) => prefill[j.id]?.state === "needs_you").length;
@@ -94,15 +95,22 @@ export function ApplyQueue({
         setError(s.error);
         return;
       }
-      const states = Object.values(s.jobs).filter((p) => p?.finishedAt && Date.now() - Date.parse(p.finishedAt) < 3_600_000);
+      // Only a run started from this page gets a summary, and it covers just the jobs that run started. A run
+      // started elsewhere (a test from the terminal) just refreshes the list quietly.
+      if (!runIds.length) return;
+      const states = runIds.map((id) => s.jobs[id]).filter(Boolean);
       const ready = states.filter((p) => p?.state === "ready").length;
       const sent = states.filter((p) => p?.state === "submitted").length;
-      const msg = sent ? `${sent} of ${states.length} applications submitted${ready ? `, ${ready} filled and waiting for you` : ""}. Check the others in Chrome.` : `${ready} of ${states.length} applications are filled in. Review each Chrome tab and submit.`;
+      const waiting = states.filter((p) => p?.state === "needs_you").length;
+      const failed = states.filter((p) => p?.state === "failed").length;
+      const parts = [sent && `${sent} submitted`, ready && `${ready} filled, ready for you to review and submit`, waiting && `${waiting} need${waiting === 1 ? "s" : ""} you (see the note on each)`, failed && `${failed} couldn't be done`].filter(Boolean);
+      const msg = `${states.length === 1 ? "The job" : `All ${states.length} jobs`} you started finished: ${parts.join(", ")}.`;
       setFlash(msg);
+      setRunIds([]);
       if ("Notification" in window && Notification.permission === "granted") new Notification("Applications ready to review", { body: msg });
     }, 5000);
     return () => clearInterval(timer);
-  }, [processing, initial]);
+  }, [processing, initial, runIds]);
 
   const run = useCallback(
     (fn: () => Promise<void>) =>
@@ -128,6 +136,7 @@ export function ApplyQueue({
       setSubmitMode(submit);
       setAllRun(all);
       setPrefill((p) => ({ ...p, ...Object.fromEntries(ids.map((id) => [id, { state: "queued" as const }])) }));
+      setRunIds(ids);
       setProcessing(true);
     });
   }, [run]);
@@ -137,9 +146,23 @@ export function ApplyQueue({
     run(async () => {
       const ids = await finishPrefill();
       setPrefill((p) => ({ ...p, ...Object.fromEntries(ids.map((id) => [id, { ...p[id], state: "queued" as const, note: "Waiting to finish" }])) }));
+      setRunIds(ids);
       setProcessing(true);
     });
   }, [run]);
+
+  // Finish just one job (after entering its email code, making its account, ...).
+  const finishOne = useCallback(
+    (id: string) => {
+      run(async () => {
+        const ids = await finishPrefill([id]);
+        setPrefill((p) => ({ ...p, ...Object.fromEntries(ids.map((x) => [x, { ...p[x], state: "queued" as const, note: "Waiting to finish" }])) }));
+        setRunIds(ids);
+        setProcessing(true);
+      });
+    },
+    [run],
+  );
 
   // A read-only second look at every filled tab: is the resume in each form that job's tailored PDF?
   const recheck = useCallback(() => {
@@ -351,6 +374,13 @@ export function ApplyQueue({
               }
             />
           ) : null}
+          {pf?.state === "needs_you" && !pf.questions?.length && (!processing || allRun) && (
+            <div>
+              <Button size="sm" disabled={isPending} onClick={() => finishOne(job.id)}>
+                <Sparkles /> Finish this one
+              </Button>
+            </div>
+          )}
           {pf && <ResumeCheckLine p={pf} />}
           {boardOnly && !pf && (
             <p className="flex items-start gap-2 rounded-lg bg-amber/12 px-3 py-2 text-sm text-amber">
@@ -438,6 +468,12 @@ export function ApplyQueue({
                     <p className="truncate text-xs text-muted">{j.role}</p>
                   </div>
                   {prefill[j.id] && <PrefillPill p={prefill[j.id]!} />}
+                  {prefill[j.id]?.resumeCheck && <ResumeDot p={prefill[j.id]!} />}
+                  {prefill[j.id]?.state === "needs_you" && (!processing || allRun) && (
+                    <Button size="xs" variant="secondary" disabled={isPending} onClick={() => finishOne(j.id)} title={prefill[j.id]?.note}>
+                      <Sparkles /> Finish
+                    </Button>
+                  )}
                   {j.warnings?.length ? <AlertTriangle className="size-4 text-overdue" aria-label="Has a warning" /> : null}
                   {j.coverLetter?.needed && <Badge variant="violet">Letter</Badge>}
                   {d && <span className={d.urgent ? "text-xs text-urgent" : "text-xs text-muted"}>{d.label}</span>}
@@ -554,6 +590,21 @@ function ResumeCheckLine({ p }: { p: PrefillView }) {
         <b>{look.label}.</b> {c.detail}
       </span>
     </p>
+  );
+}
+
+/** The resume check as a small tag on each job in the list. */
+function ResumeDot({ p }: { p: PrefillView }) {
+  const s = p.resumeCheck!.status;
+  const look = {
+    verified: { className: "bg-emerald/10 text-emerald", label: "Resume ✓" },
+    unverified: { className: "bg-amber/12 text-amber", label: "Resume ?" },
+    mismatch: { className: "bg-overdue/10 text-overdue", label: "Wrong resume" },
+  }[s];
+  return (
+    <span title={p.resumeCheck!.detail} className={`inline-flex h-5 shrink-0 items-center rounded-full px-1.5 text-[11px] font-medium ${look.className}`}>
+      {look.label}
+    </span>
   );
 }
 

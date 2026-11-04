@@ -14,7 +14,7 @@ export async function GET(req: Request) {
   if (!isAuthorizedCronRequest(req)) return Response.json({ error: "Unauthorized" }, { status: 401 });
   const limit = Math.min(Number(new URL(req.url).searchParams.get("limit")) || 6, 20);
   const research = await prisma.outreachEmail.findMany({
-    where: { status: { in: ["todo", "draft"] }, researchedAt: null },
+    where: { kind: "founder", status: { in: ["todo", "draft"] }, researchedAt: null },
     select,
     orderBy: { createdAt: "asc" },
     take: limit,

@@ -39,7 +39,7 @@ const option = (name: string) => {
   const i = argv.indexOf(`--${name}`);
   return i >= 0 ? argv[i + 1] : undefined;
 };
-const target = Number(option("count") ?? process.env.NIGHTLY_COUNT ?? 10);
+const target = Number(option("count") ?? process.env.NIGHTLY_COUNT ?? 15);
 const minScore = Number(option("min-score") ?? process.env.NIGHTLY_MIN_SCORE ?? 50);
 const maxAgeDays = Number(option("max-age") ?? process.env.NIGHTLY_MAX_AGE_DAYS ?? 14);
 const dryRun = flag("dry-run");

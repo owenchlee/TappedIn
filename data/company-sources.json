@@ -7,7 +7,9 @@
       "careerUrl": "https://github.com/negarprh/Canadian-Tech-Internships-2027",
       "adapter": "markdown-table",
       "enabled": true,
-      "config": { "url": "https://raw.githubusercontent.com/negarprh/Canadian-Tech-Internships-{year}/main/README.md" }
+      "config": {
+        "url": "https://raw.githubusercontent.com/negarprh/Canadian-Tech-Internships-{year}/main/README.md"
+      }
     },
     {
       "key": "simplify-internships",
@@ -15,8 +17,16 @@
       "careerUrl": "https://github.com/SimplifyJobs/Summer2027-Internships",
       "adapter": "simplify",
       "enabled": true,
-      "config": { "url": "https://raw.githubusercontent.com/SimplifyJobs/Summer{year}-Internships/dev/.github/scripts/listings.json" },
-      "match": { "regions": ["canada", "remote", "us"] }
+      "config": {
+        "url": "https://raw.githubusercontent.com/SimplifyJobs/Summer{year}-Internships/dev/.github/scripts/listings.json"
+      },
+      "match": {
+        "regions": [
+          "canada",
+          "remote",
+          "us"
+        ]
+      }
     },
     {
       "key": "vanshb03-internships",
@@ -24,8 +34,17 @@
       "careerUrl": "https://github.com/vanshb03/Summer2027-Internships",
       "adapter": "simplify",
       "enabled": true,
-      "config": { "url": "https://raw.githubusercontent.com/vanshb03/Summer{year}-Internships/dev/.github/scripts/listings.json", "keepsClosedJobs": true },
-      "match": { "regions": ["canada", "remote", "us"] }
+      "config": {
+        "url": "https://raw.githubusercontent.com/vanshb03/Summer{year}-Internships/dev/.github/scripts/listings.json",
+        "keepsClosedJobs": true
+      },
+      "match": {
+        "regions": [
+          "canada",
+          "remote",
+          "us"
+        ]
+      }
     },
     {
       "key": "simplify-new-grad",
@@ -33,8 +52,16 @@
       "careerUrl": "https://github.com/SimplifyJobs/New-Grad-Positions",
       "adapter": "simplify",
       "enabled": false,
-      "config": { "url": "https://raw.githubusercontent.com/SimplifyJobs/New-Grad-Positions/dev/.github/scripts/listings.json" },
-      "match": { "regions": ["canada", "remote", "us"] }
+      "config": {
+        "url": "https://raw.githubusercontent.com/SimplifyJobs/New-Grad-Positions/dev/.github/scripts/listings.json"
+      },
+      "match": {
+        "regions": [
+          "canada",
+          "remote",
+          "us"
+        ]
+      }
     },
     {
       "key": "ciena",
@@ -42,8 +69,19 @@
       "careerUrl": "https://ciena.wd5.myworkdayjobs.com/Careers",
       "adapter": "workday",
       "enabled": true,
-      "config": { "host": "ciena.wd5.myworkdayjobs.com", "tenant": "ciena", "site": "Careers", "searchText": "intern co-op" },
-      "match": { "includeTitle": "\\b(intern|internship|co-?op|student)\\b", "regions": ["canada", "remote"] }
+      "config": {
+        "host": "ciena.wd5.myworkdayjobs.com",
+        "tenant": "ciena",
+        "site": "Careers",
+        "searchText": "intern co-op"
+      },
+      "match": {
+        "includeTitle": "\\b(intern|internship|co-?op|student)\\b",
+        "regions": [
+          "canada",
+          "remote"
+        ]
+      }
     },
     {
       "key": "rbc",
@@ -51,8 +89,19 @@
       "careerUrl": "https://jobs.rbc.com/",
       "adapter": "workday",
       "enabled": true,
-      "config": { "host": "rbc.wd3.myworkdayjobs.com", "tenant": "rbc", "site": "RBCGLOBAL1", "searchText": "co-op intern" },
-      "match": { "includeTitle": "\\b(intern|internship|co-?op|student|summer analyst)\\b", "regions": ["canada", "remote"] }
+      "config": {
+        "host": "rbc.wd3.myworkdayjobs.com",
+        "tenant": "rbc",
+        "site": "RBCGLOBAL1",
+        "searchText": "co-op intern"
+      },
+      "match": {
+        "includeTitle": "\\b(intern|internship|co-?op|student|summer analyst)\\b",
+        "regions": [
+          "canada",
+          "remote"
+        ]
+      }
     },
     {
       "key": "td",
@@ -60,8 +109,19 @@
       "careerUrl": "https://jobs.td.com/",
       "adapter": "workday",
       "enabled": true,
-      "config": { "host": "td.wd3.myworkdayjobs.com", "tenant": "td", "site": "TD_Bank_Careers", "searchText": "co-op intern" },
-      "match": { "includeTitle": "\\b(intern|internship|co-?op|student)\\b", "regions": ["canada", "remote"] }
+      "config": {
+        "host": "td.wd3.myworkdayjobs.com",
+        "tenant": "td",
+        "site": "TD_Bank_Careers",
+        "searchText": "co-op intern"
+      },
+      "match": {
+        "includeTitle": "\\b(intern|internship|co-?op|student)\\b",
+        "regions": [
+          "canada",
+          "remote"
+        ]
+      }
     },
     {
       "key": "nvidia",
@@ -69,8 +129,20 @@
       "careerUrl": "https://nvidia.wd5.myworkdayjobs.com/NVIDIAExternalCareerSite",
       "adapter": "workday",
       "enabled": true,
-      "config": { "host": "nvidia.wd5.myworkdayjobs.com", "tenant": "nvidia", "site": "NVIDIAExternalCareerSite", "searchText": "intern" },
-      "match": { "includeTitle": "\\b(intern|internship|co-?op|student)\\b", "regions": ["canada", "remote", "us"] }
+      "config": {
+        "host": "nvidia.wd5.myworkdayjobs.com",
+        "tenant": "nvidia",
+        "site": "NVIDIAExternalCareerSite",
+        "searchText": "intern"
+      },
+      "match": {
+        "includeTitle": "\\b(intern|internship|co-?op|student)\\b",
+        "regions": [
+          "canada",
+          "remote",
+          "us"
+        ]
+      }
     },
     {
       "key": "cohere",
@@ -78,8 +150,12 @@
       "careerUrl": "https://jobs.ashbyhq.com/cohere",
       "adapter": "ashby",
       "enabled": true,
-      "config": { "org": "cohere" },
-      "match": { "includeTitle": "\\b(intern|internship|co-?op|student)\\b" }
+      "config": {
+        "org": "cohere"
+      },
+      "match": {
+        "includeTitle": "\\b(intern|internship|co-?op|student)\\b"
+      }
     },
     {
       "key": "wealthsimple",
@@ -87,8 +163,12 @@
       "careerUrl": "https://jobs.ashbyhq.com/wealthsimple",
       "adapter": "ashby",
       "enabled": true,
-      "config": { "org": "wealthsimple" },
-      "match": { "includeTitle": "\\b(intern|internship|co-?op|student)\\b" }
+      "config": {
+        "org": "wealthsimple"
+      },
+      "match": {
+        "includeTitle": "\\b(intern|internship|co-?op|student)\\b"
+      }
     },
     {
       "key": "ramp",
@@ -96,8 +176,12 @@
       "careerUrl": "https://jobs.ashbyhq.com/ramp",
       "adapter": "ashby",
       "enabled": true,
-      "config": { "org": "ramp" },
-      "match": { "includeTitle": "\\b(intern|internship|co-?op|student)\\b" }
+      "config": {
+        "org": "ramp"
+      },
+      "match": {
+        "includeTitle": "\\b(intern|internship|co-?op|student)\\b"
+      }
     },
     {
       "key": "notion",
@@ -105,8 +189,12 @@
       "careerUrl": "https://jobs.ashbyhq.com/notion",
       "adapter": "ashby",
       "enabled": true,
-      "config": { "org": "notion" },
-      "match": { "includeTitle": "\\b(intern|internship|co-?op|student)\\b" }
+      "config": {
+        "org": "notion"
+      },
+      "match": {
+        "includeTitle": "\\b(intern|internship|co-?op|student)\\b"
+      }
     },
     {
       "key": "robinhood",
@@ -114,7 +202,9 @@
       "careerUrl": "https://careers.robinhood.com/",
       "adapter": "greenhouse",
       "enabled": true,
-      "config": { "boardToken": "robinhood" },
+      "config": {
+        "boardToken": "robinhood"
+      },
       "match": {
         "includeTitle": "\\b(intern|internship|co-?op|university|new grad)\\b",
         "excludeTitle": "(senior|staff|principal|director|lead\\b)"
@@ -126,7 +216,9 @@
       "careerUrl": "https://www.palantir.com/careers/",
       "adapter": "lever",
       "enabled": true,
-      "config": { "company": "palantir" },
+      "config": {
+        "company": "palantir"
+      },
       "match": {
         "includeTitle": "\\b(intern|internship|co-?op|university|new grad)\\b",
         "includeLocation": "(canada|remote|toronto|ottawa|waterloo|new york|washington)"
@@ -138,8 +230,16 @@
       "careerUrl": "https://www.lyft.com/careers",
       "adapter": "greenhouse",
       "enabled": true,
-      "config": { "boardToken": "lyft" },
-      "match": { "includeTitle": "\\b(intern|internship|co-?op|student)\\b", "regions": ["canada", "remote"] }
+      "config": {
+        "boardToken": "lyft"
+      },
+      "match": {
+        "includeTitle": "\\b(intern|internship|co-?op|student)\\b",
+        "regions": [
+          "canada",
+          "remote"
+        ]
+      }
     },
     {
       "key": "pinterest",
@@ -147,8 +247,16 @@
       "careerUrl": "https://www.pinterestcareers.com/",
       "adapter": "greenhouse",
       "enabled": true,
-      "config": { "boardToken": "pinterest" },
-      "match": { "includeTitle": "\\b(intern|internship|co-?op|student)\\b", "regions": ["canada", "remote"] }
+      "config": {
+        "boardToken": "pinterest"
+      },
+      "match": {
+        "includeTitle": "\\b(intern|internship|co-?op|student)\\b",
+        "regions": [
+          "canada",
+          "remote"
+        ]
+      }
     },
     {
       "key": "stripe",
@@ -156,8 +264,16 @@
       "careerUrl": "https://stripe.com/jobs",
       "adapter": "greenhouse",
       "enabled": true,
-      "config": { "boardToken": "stripe" },
-      "match": { "includeTitle": "\\b(intern|internship|co-?op|student)\\b", "regions": ["canada", "remote"] }
+      "config": {
+        "boardToken": "stripe"
+      },
+      "match": {
+        "includeTitle": "\\b(intern|internship|co-?op|student)\\b",
+        "regions": [
+          "canada",
+          "remote"
+        ]
+      }
     },
     {
       "key": "faire",
@@ -165,8 +281,16 @@
       "careerUrl": "https://www.faire.com/careers",
       "adapter": "greenhouse",
       "enabled": true,
-      "config": { "boardToken": "faire" },
-      "match": { "includeTitle": "\\b(intern|internship|co-?op|student)\\b", "regions": ["canada", "remote"] }
+      "config": {
+        "boardToken": "faire"
+      },
+      "match": {
+        "includeTitle": "\\b(intern|internship|co-?op|student)\\b",
+        "regions": [
+          "canada",
+          "remote"
+        ]
+      }
     },
     {
       "key": "instacart",
@@ -174,8 +298,16 @@
       "careerUrl": "https://instacart.careers/",
       "adapter": "greenhouse",
       "enabled": true,
-      "config": { "boardToken": "instacart" },
-      "match": { "includeTitle": "\\b(intern|internship|co-?op|student)\\b", "regions": ["canada", "remote"] }
+      "config": {
+        "boardToken": "instacart"
+      },
+      "match": {
+        "includeTitle": "\\b(intern|internship|co-?op|student)\\b",
+        "regions": [
+          "canada",
+          "remote"
+        ]
+      }
     },
     {
       "key": "tenstorrent",
@@ -183,8 +315,16 @@
       "careerUrl": "https://tenstorrent.com/careers",
       "adapter": "greenhouse",
       "enabled": true,
-      "config": { "boardToken": "tenstorrent" },
-      "match": { "includeTitle": "\\b(intern|internship|co-?op|student)\\b", "regions": ["canada", "remote"] }
+      "config": {
+        "boardToken": "tenstorrent"
+      },
+      "match": {
+        "includeTitle": "\\b(intern|internship|co-?op|student)\\b",
+        "regions": [
+          "canada",
+          "remote"
+        ]
+      }
     },
     {
       "key": "d2l",
@@ -192,8 +332,16 @@
       "careerUrl": "https://www.d2l.com/careers/",
       "adapter": "greenhouse",
       "enabled": true,
-      "config": { "boardToken": "d2l" },
-      "match": { "includeTitle": "\\b(intern|internship|co-?op|student)\\b", "regions": ["canada", "remote"] }
+      "config": {
+        "boardToken": "d2l"
+      },
+      "match": {
+        "includeTitle": "\\b(intern|internship|co-?op|student)\\b",
+        "regions": [
+          "canada",
+          "remote"
+        ]
+      }
     },
     {
       "key": "1password",
@@ -201,8 +349,16 @@
       "careerUrl": "https://jobs.ashbyhq.com/1password",
       "adapter": "ashby",
       "enabled": true,
-      "config": { "org": "1password" },
-      "match": { "includeTitle": "\\b(intern|internship|co-?op|student)\\b", "regions": ["canada", "remote"] }
+      "config": {
+        "org": "1password"
+      },
+      "match": {
+        "includeTitle": "\\b(intern|internship|co-?op|student)\\b",
+        "regions": [
+          "canada",
+          "remote"
+        ]
+      }
     },
     {
       "key": "jobber",
@@ -210,8 +366,16 @@
       "careerUrl": "https://jobs.ashbyhq.com/jobber",
       "adapter": "ashby",
       "enabled": true,
-      "config": { "org": "jobber" },
-      "match": { "includeTitle": "\\b(intern|internship|co-?op|student)\\b", "regions": ["canada", "remote"] }
+      "config": {
+        "org": "jobber"
+      },
+      "match": {
+        "includeTitle": "\\b(intern|internship|co-?op|student)\\b",
+        "regions": [
+          "canada",
+          "remote"
+        ]
+      }
     },
     {
       "key": "neo-financial",
@@ -219,8 +383,16 @@
       "careerUrl": "https://jobs.ashbyhq.com/neofinancial",
       "adapter": "ashby",
       "enabled": true,
-      "config": { "org": "neofinancial" },
-      "match": { "includeTitle": "\\b(intern|internship|co-?op|student)\\b", "regions": ["canada", "remote"] }
+      "config": {
+        "org": "neofinancial"
+      },
+      "match": {
+        "includeTitle": "\\b(intern|internship|co-?op|student)\\b",
+        "regions": [
+          "canada",
+          "remote"
+        ]
+      }
     },
     {
       "key": "waabi",
@@ -228,8 +400,16 @@
       "careerUrl": "https://jobs.lever.co/waabi",
       "adapter": "lever",
       "enabled": true,
-      "config": { "company": "waabi" },
-      "match": { "includeTitle": "\\b(intern|internship|co-?op|student)\\b", "regions": ["canada", "remote"] }
+      "config": {
+        "company": "waabi"
+      },
+      "match": {
+        "includeTitle": "\\b(intern|internship|co-?op|student)\\b",
+        "regions": [
+          "canada",
+          "remote"
+        ]
+      }
     },
     {
       "key": "kepler",
@@ -237,8 +417,16 @@
       "careerUrl": "https://jobs.lever.co/kepler",
       "adapter": "lever",
       "enabled": true,
-      "config": { "company": "kepler" },
-      "match": { "includeTitle": "\\b(intern|internship|co-?op|student)\\b", "regions": ["canada", "remote"] }
+      "config": {
+        "company": "kepler"
+      },
+      "match": {
+        "includeTitle": "\\b(intern|internship|co-?op|student)\\b",
+        "regions": [
+          "canada",
+          "remote"
+        ]
+      }
     },
     {
       "key": "magnet-forensics",
@@ -246,8 +434,466 @@
       "careerUrl": "https://jobs.lever.co/magnetforensics",
       "adapter": "lever",
       "enabled": true,
-      "config": { "company": "magnetforensics" },
-      "match": { "includeTitle": "\\b(intern|internship|co-?op|student)\\b", "regions": ["canada", "remote"] }
+      "config": {
+        "company": "magnetforensics"
+      },
+      "match": {
+        "includeTitle": "\\b(intern|internship|co-?op|student)\\b",
+        "regions": [
+          "canada",
+          "remote"
+        ]
+      }
+    },
+    {
+      "key": "databricks",
+      "name": "Databricks",
+      "careerUrl": "https://www.databricks.com/company/careers",
+      "adapter": "greenhouse",
+      "enabled": true,
+      "config": {
+        "boardToken": "databricks"
+      },
+      "match": {
+        "includeTitle": "\b(intern|internship|co-?op|student)\b",
+        "regions": [
+          "canada",
+          "remote",
+          "us"
+        ]
+      }
+    },
+    {
+      "key": "coinbase",
+      "name": "Coinbase",
+      "careerUrl": "https://www.coinbase.com/careers",
+      "adapter": "greenhouse",
+      "enabled": true,
+      "config": {
+        "boardToken": "coinbase"
+      },
+      "match": {
+        "includeTitle": "\b(intern|internship|co-?op|student)\b",
+        "regions": [
+          "canada",
+          "remote",
+          "us"
+        ]
+      }
+    },
+    {
+      "key": "verkada",
+      "name": "Verkada",
+      "careerUrl": "https://www.verkada.com/careers/",
+      "adapter": "greenhouse",
+      "enabled": true,
+      "config": {
+        "boardToken": "verkada"
+      },
+      "match": {
+        "includeTitle": "\b(intern|internship|co-?op|student)\b",
+        "regions": [
+          "canada",
+          "remote",
+          "us"
+        ]
+      }
+    },
+    {
+      "key": "epic-games",
+      "name": "Epic Games",
+      "careerUrl": "https://www.epicgames.com/site/en-US/careers",
+      "adapter": "greenhouse",
+      "enabled": true,
+      "config": {
+        "boardToken": "epicgames"
+      },
+      "match": {
+        "includeTitle": "\b(intern|internship|co-?op|student)\b",
+        "regions": [
+          "canada",
+          "remote",
+          "us"
+        ]
+      }
+    },
+    {
+      "key": "figma",
+      "name": "Figma",
+      "careerUrl": "https://www.figma.com/careers/",
+      "adapter": "greenhouse",
+      "enabled": true,
+      "config": {
+        "boardToken": "figma"
+      },
+      "match": {
+        "includeTitle": "\b(intern|internship|co-?op|student)\b",
+        "regions": [
+          "canada",
+          "remote",
+          "us"
+        ]
+      }
+    },
+    {
+      "key": "cloudflare",
+      "name": "Cloudflare",
+      "careerUrl": "https://www.cloudflare.com/careers/",
+      "adapter": "greenhouse",
+      "enabled": true,
+      "config": {
+        "boardToken": "cloudflare"
+      },
+      "match": {
+        "includeTitle": "\b(intern|internship|co-?op|student)\b",
+        "regions": [
+          "canada",
+          "remote",
+          "us"
+        ]
+      }
+    },
+    {
+      "key": "scale-ai",
+      "name": "Scale AI",
+      "careerUrl": "https://scale.com/careers",
+      "adapter": "greenhouse",
+      "enabled": true,
+      "config": {
+        "boardToken": "scaleai"
+      },
+      "match": {
+        "includeTitle": "\b(intern|internship|co-?op|student)\b",
+        "regions": [
+          "canada",
+          "remote",
+          "us"
+        ]
+      }
+    },
+    {
+      "key": "samsara",
+      "name": "Samsara",
+      "careerUrl": "https://www.samsara.com/company/careers",
+      "adapter": "greenhouse",
+      "enabled": true,
+      "config": {
+        "boardToken": "samsara"
+      },
+      "match": {
+        "includeTitle": "\b(intern|internship|co-?op|student)\b",
+        "regions": [
+          "canada",
+          "remote",
+          "us"
+        ]
+      }
+    },
+    {
+      "key": "duolingo",
+      "name": "Duolingo",
+      "careerUrl": "https://careers.duolingo.com/",
+      "adapter": "greenhouse",
+      "enabled": true,
+      "config": {
+        "boardToken": "duolingo"
+      },
+      "match": {
+        "includeTitle": "\b(intern|internship|co-?op|student)\b",
+        "regions": [
+          "canada",
+          "remote",
+          "us"
+        ]
+      }
+    },
+    {
+      "key": "datadog",
+      "name": "Datadog",
+      "careerUrl": "https://careers.datadoghq.com/",
+      "adapter": "greenhouse",
+      "enabled": true,
+      "config": {
+        "boardToken": "datadog"
+      },
+      "match": {
+        "includeTitle": "\b(intern|internship|co-?op|student)\b",
+        "regions": [
+          "canada",
+          "remote",
+          "us"
+        ]
+      }
+    },
+    {
+      "key": "mongodb",
+      "name": "MongoDB",
+      "careerUrl": "https://www.mongodb.com/careers",
+      "adapter": "greenhouse",
+      "enabled": true,
+      "config": {
+        "boardToken": "mongodb"
+      },
+      "match": {
+        "includeTitle": "\b(intern|internship|co-?op|student)\b",
+        "regions": [
+          "canada",
+          "remote",
+          "us"
+        ]
+      }
+    },
+    {
+      "key": "appian",
+      "name": "Appian",
+      "careerUrl": "https://appian.com/about/careers",
+      "adapter": "greenhouse",
+      "enabled": true,
+      "config": {
+        "boardToken": "appian"
+      },
+      "match": {
+        "includeTitle": "\b(intern|internship|co-?op|student)\b",
+        "regions": [
+          "canada",
+          "remote",
+          "us"
+        ]
+      }
+    },
+    {
+      "key": "affirm",
+      "name": "Affirm",
+      "careerUrl": "https://www.affirm.com/careers",
+      "adapter": "greenhouse",
+      "enabled": true,
+      "config": {
+        "boardToken": "affirm"
+      },
+      "match": {
+        "includeTitle": "\b(intern|internship|co-?op|student)\b",
+        "regions": [
+          "canada",
+          "remote",
+          "us"
+        ]
+      }
+    },
+    {
+      "key": "singlestore",
+      "name": "SingleStore",
+      "careerUrl": "https://www.singlestore.com/careers/",
+      "adapter": "greenhouse",
+      "enabled": true,
+      "config": {
+        "boardToken": "singlestore"
+      },
+      "match": {
+        "includeTitle": "\b(intern|internship|co-?op|student)\b",
+        "regions": [
+          "canada",
+          "remote",
+          "us"
+        ]
+      }
+    },
+    {
+      "key": "roblox",
+      "name": "Roblox",
+      "careerUrl": "https://careers.roblox.com/",
+      "adapter": "greenhouse",
+      "enabled": true,
+      "config": {
+        "boardToken": "roblox"
+      },
+      "match": {
+        "includeTitle": "\b(intern|internship|co-?op|student)\b",
+        "regions": [
+          "canada",
+          "remote",
+          "us"
+        ]
+      }
+    },
+    {
+      "key": "vercel",
+      "name": "Vercel",
+      "careerUrl": "https://vercel.com/careers",
+      "adapter": "greenhouse",
+      "enabled": true,
+      "config": {
+        "boardToken": "vercel"
+      },
+      "match": {
+        "includeTitle": "\b(intern|internship|co-?op|student)\b",
+        "regions": [
+          "canada",
+          "remote",
+          "us"
+        ]
+      }
+    },
+    {
+      "key": "sendbird",
+      "name": "Sendbird",
+      "careerUrl": "https://sendbird.com/careers",
+      "adapter": "greenhouse",
+      "enabled": true,
+      "config": {
+        "boardToken": "sendbird"
+      },
+      "match": {
+        "includeTitle": "\b(intern|internship|co-?op|student)\b",
+        "regions": [
+          "canada",
+          "remote",
+          "us"
+        ]
+      }
+    },
+    {
+      "key": "zoox",
+      "name": "Zoox",
+      "careerUrl": "https://jobs.lever.co/zoox",
+      "adapter": "lever",
+      "enabled": true,
+      "config": {
+        "company": "zoox"
+      },
+      "match": {
+        "includeTitle": "\b(intern|internship|co-?op|student)\b",
+        "regions": [
+          "canada",
+          "remote",
+          "us"
+        ]
+      }
+    },
+    {
+      "key": "shield-ai",
+      "name": "Shield AI",
+      "careerUrl": "https://jobs.lever.co/shieldai",
+      "adapter": "lever",
+      "enabled": true,
+      "config": {
+        "company": "shieldai"
+      },
+      "match": {
+        "includeTitle": "\b(intern|internship|co-?op|student)\b",
+        "regions": [
+          "canada",
+          "remote",
+          "us"
+        ]
+      }
+    },
+    {
+      "key": "perplexity",
+      "name": "Perplexity",
+      "careerUrl": "https://jobs.ashbyhq.com/perplexity",
+      "adapter": "ashby",
+      "enabled": true,
+      "config": {
+        "org": "perplexity"
+      },
+      "match": {
+        "includeTitle": "\b(intern|internship|co-?op|student)\b",
+        "regions": [
+          "canada",
+          "remote",
+          "us"
+        ]
+      }
+    },
+    {
+      "key": "snowflake",
+      "name": "Snowflake",
+      "careerUrl": "https://jobs.ashbyhq.com/snowflake",
+      "adapter": "ashby",
+      "enabled": true,
+      "config": {
+        "org": "snowflake"
+      },
+      "match": {
+        "includeTitle": "\b(intern|internship|co-?op|student)\b",
+        "regions": [
+          "canada",
+          "remote",
+          "us"
+        ]
+      }
+    },
+    {
+      "key": "sierra",
+      "name": "Sierra",
+      "careerUrl": "https://jobs.ashbyhq.com/sierra",
+      "adapter": "ashby",
+      "enabled": true,
+      "config": {
+        "org": "sierra"
+      },
+      "match": {
+        "includeTitle": "\b(intern|internship|co-?op|student)\b",
+        "regions": [
+          "canada",
+          "remote",
+          "us"
+        ]
+      }
+    },
+    {
+      "key": "hex",
+      "name": "Hex",
+      "careerUrl": "https://jobs.ashbyhq.com/hex",
+      "adapter": "ashby",
+      "enabled": true,
+      "config": {
+        "org": "hex"
+      },
+      "match": {
+        "includeTitle": "\b(intern|internship|co-?op|student)\b",
+        "regions": [
+          "canada",
+          "remote",
+          "us"
+        ]
+      }
+    },
+    {
+      "key": "modal",
+      "name": "Modal",
+      "careerUrl": "https://jobs.ashbyhq.com/modal",
+      "adapter": "ashby",
+      "enabled": true,
+      "config": {
+        "org": "modal"
+      },
+      "match": {
+        "includeTitle": "\b(intern|internship|co-?op|student)\b",
+        "regions": [
+          "canada",
+          "remote",
+          "us"
+        ]
+      }
+    },
+    {
+      "key": "decagon",
+      "name": "Decagon",
+      "careerUrl": "https://jobs.ashbyhq.com/decagon",
+      "adapter": "ashby",
+      "enabled": true,
+      "config": {
+        "org": "decagon"
+      },
+      "match": {
+        "includeTitle": "\b(intern|internship|co-?op|student)\b",
+        "regions": [
+          "canada",
+          "remote",
+          "us"
+        ]
+      }
     }
   ]
 }

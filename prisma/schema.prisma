@@ -285,9 +285,16 @@ model OutreachEmail {
   proofUrl       String    @default("") // where Owen published it (gist etc.)
   followUpBody   String    @default("") // the one follow-up, with something new
   researchedAt   DateTime?
+  // Recruiter rows (kind "recruiter") are one email per recruiter and role; founders keep kind "founder".
+  kind           String    @default("founder") // founder | recruiter
+  roleTitle      String    @default("")
+  roleUrl        String    @default("")
+  contactTitle   String    @default("") // the recruiter's own title
+  source         String    @default("") // where the address came from
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([status, followUpAt])
+  @@index([kind])
 }

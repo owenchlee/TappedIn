@@ -95,10 +95,10 @@ export async function pickNightly(opts: { target: number; minScore: number; maxA
       if (longInPerson(sr, r.role, text)) continue;
       if (r.region === "us" && !usVisaOk(r.company, text)) continue;
       if (r.region !== "remote" || mentionsCanada(text) || usVisaOk(r.company, text)) {
-        // A job-board listing: find the employer's own posting, and pass on one that's probably been
-        // taken down before any Claude time goes into tailoring for it (there are plenty of others).
+        // A job-board listing: find the employer's own posting, and pass on one without a real link before
+        // any Claude time goes into tailoring for it: the queue won't show it anyway (isQueued).
         const src = isThirdParty(r.url) ? await findRealSource(r) : null;
-        if (src?.url === null && src.likelyClosed) continue;
+        if (src?.url === null) continue;
         eligible.push(src ? { ...r, applyUrl: src.url ?? undefined, applyUrlNote: src.how } : r);
       }
     }

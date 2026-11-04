@@ -6,7 +6,7 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { LinkTabs } from "@/components/ui/LinkTabs";
 import { SearchBox } from "@/components/SearchBox";
 import { NewOutreachButton, OutreachCard } from "@/components/outreach/OutreachCard";
-import { OUTREACH_STATUSES, STATUS_LABEL, type OutreachStatus } from "@/lib/outreach";
+import { KIND_LABEL, OUTREACH_KINDS, OUTREACH_STATUSES, STATUS_LABEL, type OutreachKind, type OutreachStatus } from "@/lib/outreach";
 
 export const metadata: Metadata = { title: "Outreach" };
 export const dynamic = "force-dynamic";
@@ -17,9 +17,19 @@ export default async function OutreachPage({ searchParams }: PageProps<"/outreac
   const raw = typeof sp.s === "string" ? sp.s : "draft";
   const tab: OutreachStatus = (OUTREACH_STATUSES as readonly string[]).includes(raw) ? (raw as OutreachStatus) : "draft";
 
-  const all = await prisma.outreachEmail.findMany({
+  const rawKind = typeof sp.k === "string" ? sp.k : "";
+  const kind = (OUTREACH_KINDS as readonly string[]).includes(rawKind) ? (rawKind as OutreachKind) : null;
+  const href = (s: OutreachStatus, k: OutreachKind | null) => {
+    const params = new URLSearchParams();
+    if (s !== "draft") params.set("s", s);
+    if (k) params.set("k", k);
+    const qs = params.toString();
+    return qs ? `/outreach?${qs}` : "/outreach";
+  };
+  const everyone = await prisma.outreachEmail.findMany({
     orderBy: [{ followUpAt: { sort: "asc", nulls: "last" } }, { createdAt: "asc" }],
   });
+  const all = kind ? everyone.filter((r) => r.kind === kind) : everyone;
   const counts = Object.fromEntries(OUTREACH_STATUSES.map((s) => [s, all.filter((r) => r.status === s).length]));
   const needle = q.toLowerCase();
   const rows = all.filter(
@@ -41,9 +51,18 @@ export default async function OutreachPage({ searchParams }: PageProps<"/outreac
         }
       />
       <LinkTabs
+        className="mb-2"
+        items={[null, ...OUTREACH_KINDS].map((k) => ({
+          href: href(tab, k),
+          label: k ? KIND_LABEL[k] : "Everyone",
+          active: k === kind,
+          count: k ? everyone.filter((r) => r.kind === k).length : everyone.length,
+        }))}
+      />
+      <LinkTabs
         className="mb-5"
         items={OUTREACH_STATUSES.map((s) => ({
-          href: s === "draft" ? "/outreach" : `/outreach?s=${s}`,
+          href: href(s, kind),
           label: STATUS_LABEL[s],
           active: s === tab,
           count: counts[s],
