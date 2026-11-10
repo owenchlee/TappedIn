@@ -102,6 +102,45 @@ function pdftotextPath(): string {
   return existsSync(exe) ? exe : "pdftotext";
 }
 
+export type PageSpace = { linesOver: number; freeLines: number };
+
+/**
+ * How far a resume is from exactly filling page 1, in text lines: `linesOver` counts lines spilled onto
+ * later pages, `freeLines` the empty lines left above page 1's bottom margin. Lets a trim cut the right
+ * amount in one pass instead of guessing from "2 pages" (idea from pqthangv/AutoInternshipClaude).
+ * Reads `pdftotext -bbox` output. Assumes equal top and bottom margins, as in Jake's template.
+ */
+export function pageSpaceFromBbox(html: string): PageSpace | null {
+  const pages = html.split(/<page\b/).slice(1).map((chunk) => ({
+    height: Number(/height="([\d.]+)"/.exec(chunk)?.[1]),
+    words: [...chunk.matchAll(/<word[^>]*yMin="([\d.]+)"[^>]*yMax="([\d.]+)"/g)].map((m) => ({ top: Number(m[1]), bottom: Number(m[2]) })),
+  }));
+  const first = pages[0];
+  if (!first?.words.length || !first.height) return null;
+  // Words whose bottoms sit within 2pt of each other are one line.
+  const lineCount = (words: { bottom: number }[]) => {
+    const ys = [...new Set(words.map((w) => Math.round(w.bottom)))].sort((a, b) => a - b);
+    return { ys, n: ys.filter((y, i) => i === 0 || y - ys[i - 1] > 2).length };
+  };
+  const { ys } = lineCount(first.words);
+  const gaps = ys.slice(1).map((y, i) => y - ys[i]).filter((g) => g > 2).sort((a, b) => a - b);
+  const lineHeight = Math.min(20, Math.max(8, gaps[Math.floor(gaps.length / 2)] ?? 12));
+  const topMargin = Math.min(...first.words.map((w) => w.top));
+  const lastLine = Math.max(...first.words.map((w) => w.bottom));
+  const freeLines = Math.max(0, Math.floor((first.height - topMargin - lastLine) / lineHeight));
+  const linesOver = pages.slice(1).reduce((sum, p) => sum + lineCount(p.words).n, 0);
+  return { linesOver, freeLines };
+}
+
+/** {@link pageSpaceFromBbox} for a PDF file; null when pdftotext can't read it. */
+export function pageSpace(pdfFile: string): Promise<PageSpace | null> {
+  return new Promise((resolve) => {
+    execFile(pdftotextPath(), ["-bbox", "-enc", "UTF-8", pdfFile, "-"], { timeout: 60_000, windowsHide: true, maxBuffer: 20 * 1024 * 1024 }, (err, stdout) =>
+      resolve(err ? null : pageSpaceFromBbox(stdout)),
+    );
+  });
+}
+
 /** The PDF's text: reading order by default, or `layout` to keep line wraps and indents. */
 export function pdfToText(pdfFile: string, opts: { layout?: boolean } = {}): Promise<string> {
   return new Promise((resolve, reject) => {

@@ -60,6 +60,16 @@ ${pickBaseStep(opts.forcedBase)}
   the section order, and the template's commands (\\resumeProjectHeading, \\resumeItem, etc.).
 - It must still fit on ONE page. Keep the same number of projects or fewer, keep the same number of
   bullets per entry as the base, and keep each bullet about as long as the one it replaces.
+- First read jd.txt for its angle: the three to five things this team will judge him on, in the
+  posting's own words (e.g. "embedded C, hardware bring-up, test automation").
+- Rewrite every kept bullet for that angle: decide which of those things it proves, lead with the
+  action and the posting's word for that skill (only if true to what he did), pull that entry's
+  matching facts forward, and end with the bullet's result if it has one. Keep a bullet word for word
+  only when it already leads with what this posting wants. Picking and reordering alone is not
+  tailoring: in past runs over half the bullets went out unchanged.
+- Honest mapping: synonyms are fine ("REST endpoints" for Flask routes he wrote); upgrades are not.
+  "Contributed to" never becomes "led", a team result never becomes his alone, a class project never
+  becomes a product, and no number is rounded up or combined.
 - Allowed edits: reorder projects so the most relevant come first; swap a less relevant project
   for a more relevant one from experience.md; rephrase bullets to use the posting's own vocabulary
   for things Owen actually did; reorder or adjust the Skills line (only skills backed by
@@ -92,8 +102,9 @@ cover-letter.txt, check the result is still truthful, 250 to 350 words, and free
 overwrite cover-letter.txt with the humanized letter. Reply with just DONE.`;
 }
 
-export function trimPrompt(pages: number): string {
-  return `resume.tex currently compiles to ${pages} pages. It must be exactly one page.
+export function trimPrompt(pages: number, linesOver?: number | null): string {
+  const amount = linesOver ? ` About ${linesOver} line${linesOver === 1 ? "" : "s"} spill past page 1: cut about that many in one pass (a two-line bullet cut to one line saves one), no more.` : "";
+  return `resume.tex currently compiles to ${pages} pages. It must be exactly one page.${amount}
 Edit resume.tex in place: shorten the least relevant bullets first, then drop the least relevant
 project if you have to. Do not touch anything before \\begin{document}. Do not add new content.
 Never use em dashes. Reply with just DONE.`;

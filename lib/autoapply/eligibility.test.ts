@@ -19,6 +19,13 @@ describe("eligibilityWarnings", () => {
     expect(eligibilityWarnings("This position is subject to ITAR and requires a U.S. person.").join()).toMatch(/ITAR/);
   });
 
+  it("doesn't flag wording that lets non-citizens in", () => {
+    expect(eligibilityWarnings("Applicants must be a U.S. citizen, permanent resident, or otherwise authorized to work in the U.S.")).not.toContain("Requires U.S. citizenship");
+    expect(eligibilityWarnings("This role may involve export control (ITAR) information; offers may require an export license for non-U.S. persons.").join()).not.toMatch(/ITAR/);
+    // A real ITAR rule elsewhere in the same posting still counts.
+    expect(eligibilityWarnings("Work may involve export control matters. Under ITAR, this position is limited to a U.S. person as defined by law, and that is a firm requirement for every hire on this team.").join()).toMatch(/ITAR/);
+  });
+
   it("flags no sponsorship separately", () => {
     expect(eligibilityWarnings("We are unable to sponsor visas for this role.").join()).toMatch(/sponsorship/);
     expect(eligibilityWarnings("Candidates must be authorized to work without sponsorship.").join()).toMatch(/sponsorship/);

@@ -16,7 +16,7 @@
 import { copyFileSync, existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { PRIVATE_DIR, createJob, jobDir, readJob, writeJob, type Job, type StepName, type StepState } from "../lib/autoapply/job";
-import { bodyProblems, compileTex, enforcePreamble, fontsFromLog, pdfToText } from "../lib/autoapply/latex";
+import { bodyProblems, compileTex, enforcePreamble, fontsFromLog, pageSpace, pdfToText } from "../lib/autoapply/latex";
 import { factProblems, letterNumberProblems, resumeSourceText } from "../lib/autoapply/facts";
 import { runClaude, usedHumanizer } from "../lib/autoapply/claude";
 import { coverLetterPrompt, letterFixPrompt, fixPrompt, humanizeRetryPrompt, problemsPrompt, reviewPrompt, revisePrompt, tailorPrompt, trimPrompt } from "../lib/autoapply/prompts";
@@ -137,7 +137,7 @@ async function passHardChecks({ baseTex, factSources, baseFonts }: CheckCtx) {
     const compiled = await compileTex(dir, "resume.tex");
     let followUp: string | null = null;
     if (!compiled.ok) followUp = fixPrompt(compiled.error ?? "unknown error");
-    else if ((compiled.pages ?? 1) > 1) followUp = trimPrompt(compiled.pages!);
+    else if ((compiled.pages ?? 1) > 1) followUp = trimPrompt(compiled.pages!, (await pageSpace(path.join(dir, "resume.pdf")))?.linesOver);
     else {
       const extra = baseFonts?.size ? [...fontsFromLog(dir, "resume.tex")].filter((f) => !baseFonts.has(f)) : [];
       if (extra.length) {

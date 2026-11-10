@@ -2,6 +2,7 @@ import { existsSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import type { ClaudeRun } from "./claude";
 import { PRIVATE_DIR, jobDir, type Job } from "./job";
+import { RATING_RULE } from "./formfill";
 
 // Prefill: open queued jobs in Owen's Chrome, one tab each, and let Simplify fill the forms while a
 // headless `claude -p --chrome` swaps in the tailored resume. Nothing is ever submitted; Owen reviews
@@ -229,9 +230,11 @@ ${
    - Sponsorship and work-authorization questions depend on where the job is: use the Canada fields for jobs in Canada, the U.S. fields for U.S. jobs.
    - Open-ended questions (why us, mission, tell us about a project, etc.): write the answer yourself from the experience bank. Plain, direct, first person, 60 to 150 words unless the field limits it, specific to this company and role, no em dashes, nothing from outside the bank, nothing marked unconfirmed, and never mention the robotics-news Instagram project. Don't leave these blank.
    - Check Owen's saved answers (below) first: if one matches the question by meaning, use it.
+   - ${RATING_RULE}
    - If a question needs a personal fact or choice that is NOT in the profile, saved answers or experience bank (a phone number, a preference, a yes/no about him), do not guess. Fill in everything else, then list each such question in "questions" (exact text, plus the choices if it is a dropdown or radio) and report needs_you without submitting. Owen will answer it and it is saved for next time. Essay-style questions are not these: you write those.
    - Voluntary self-identification pages: fill with the profile's EEO answers; don't flag them for review.
-7. Multi-page forms: keep going. Fill each page, click Next / Continue / Save and Continue to move on, and don't stop at page 2 of 5. Go all the way to the final review / submit page. Scroll through once to check the required fields are filled. ${submit ? "Then do step 8." : "Then stop; never click the final submit."}${submit ? `
+7. Multi-page forms: keep going. Fill each page, click Next / Continue / Save and Continue to move on, and don't stop at page 2 of 5. Go all the way to the final review / submit page. Scroll through once to check the required fields are filled. ${submit ? "Then do step 8." : "Then stop; never click the final submit."}
+   iCIMS (*.icims.com) has no review page, and EVERY step's button says Submit. On every step except the last one still to do, that Submit only saves the step: click it to move on (this is not the final submit). The page text marks steps "(Current Step)", "(Completed Step)" and "(Incomplete Step)"; steps can be done out of order, so the last one is the current step once every other step is completed, whatever its number. That step can hold several short forms, counted in its heading ("Portal Specific Forms (1/3)"): click Submit on each form before the final one, then fill the final form (3/3, or the one on screen when there's no count) and treat ITS Submit as the final submit${submit ? " (step 8's gate applies to it)" : ": stop there without clicking it"}. If the form is inside a frame you can't read, open the page's own link with in_iframe=1 added.${submit ? `
 8. SUBMIT GATE. Click the final Submit only if ALL of these are true; otherwise do NOT click it, and report needs_you (or ready if only a human check remains) saying which gate failed:
    a. The form is on the employer's own site or its ATS (Greenhouse, Lever, Workday, Ashby, iCIMS, SmartRecruiters...), never a job board, and it is for this job (${job.company}, ${job.role}), not a different role.
    b. The resume field holds the tailored resume: re-run the file-input script and its size must be exactly ${submit.resumeSize} bytes. If the site hides sizes, the displayed filename must be Owen_Lee_Resume.pdf, uploaded by you. If neither holds, do not submit.

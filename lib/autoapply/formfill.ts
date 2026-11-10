@@ -42,6 +42,9 @@ export function trimFields(fields: FormField[]): FormField[] {
     .map((f) => ({ ...f, label: f.label.replace(/\s+/g, " ").replace(/[✱*]\s*$/, "").trim().slice(0, 300), options: f.options?.slice(0, 60).map((o) => o.slice(0, 120)) }));
 }
 
+/** Rating / years / start-date questions are answerable, not "ask" items (from pqthangv/AutoInternshipClaude's filling rules). */
+export const RATING_RULE = `Skill ratings and "years of experience": answer them yourself, never "ask". A skill the experience bank shows gets the level its evidence supports, leaning up rather than down (never "none" or "no experience"); years count from its earliest use in the bank to today, rounded up. A skill the bank doesn't show gets the lowest level above "none". A full-time start date after graduation is the first day of the month after his graduation date.`;
+
 export function fillPrompt(job: Job, fields: FormField[], profile: string, savedAnswers: string, experience: string, step = 0): string {
   return `You are answering ONE job application form for Owen Lee. Return answers only; a script types them in. You have no tools.
 
@@ -59,6 +62,7 @@ Rules:
 - A field that asks for a full name gets "Owen Lee". "Preferred name" gets the profile's preferredName.
 - Open-ended questions (why us, mission, a project, etc.): write the answer yourself from the experience bank. Plain, direct, first person, 60 to 150 words unless the field's maxLength is smaller, specific to this company and role, no em dashes, nothing from outside the bank, nothing marked unconfirmed, and never mention the robotics-news Instagram project. Don't leave these blank.
 - Saved answers (below) win when one matches a question by meaning.
+- ${RATING_RULE}
 - Leave out any field that is optional and has no good answer in the profile. Leave out hidden-looking or trap fields (a "fax", "leave this empty", a question asking for a word from the page).
 - Questions asking whether you are human, a bot, or used AI to apply: don't answer; put their keys in "ask".
 - A REQUIRED fact that is genuinely missing from the profile, saved answers and bank (a number, a personal choice, a yes/no about him): don't guess; put its key in "ask".

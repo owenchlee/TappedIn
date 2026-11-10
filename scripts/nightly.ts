@@ -31,7 +31,9 @@ const LOCK = path.join(NIGHTLY_DIR, "running.lock");
 const JOB_TIMEOUT_MS = 30 * 60_000;
 // Claude Code's plan limit: no point starting more jobs until it resets.
 // e.g. "You've hit your session limit · resets 2am (America/Toronto)".
-const LIMIT_RE = /session limit|usage limit|weekly limit|rate limit|limit reached|hit your (\w+ )?limit|out of extra usage/i;
+// "5-hour" has a hyphen: \w+ alone missed it, and 25 jobs were burned as plain failures (2026-11-07/10).
+// A dropped connection is just as temporary: wait and retry instead of losing the job.
+const LIMIT_RE = /session limit|usage limit|weekly limit|rate limit|limit reached|hit your ([\w-]+ )?limit|out of extra usage|can't reach the api server/i;
 
 const argv = process.argv.slice(2);
 const flag = (name: string) => argv.includes(`--${name}`);
