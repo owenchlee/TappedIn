@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Job } from "./job";
-import { bigCompany, clashesWithSchool, inTargetTerm, isQueued, labelPdf, longInPerson, mentionsCanada, queueOrder, realismScore, spreadPicks, unrealisticTitle } from "./queue";
+import { bigCompany, clashesWithSchool, identityRestricted, inTargetTerm, isQueued, labelPdf, longInPerson, mentionsCanada, queueOrder, realismScore, spreadPicks, unrealisticTitle } from "./queue";
 import { termsInText } from "@/lib/fit/requirements";
 
 const now = new Date("2026-10-05T12:00:00Z");
@@ -152,6 +152,14 @@ describe("longInPerson", () => {
     expect(longInPerson("remote", "Firmware Co-op (8 months)")).toBe(false);
     expect(longInPerson("canada", "Software Intern", "4 month or 8 month terms available")).toBe(false);
     expect(longInPerson("canada", "Software Intern")).toBe(false);
+  });
+
+  it("spots programs restricted to a group", () => {
+    expect(identityRestricted("Canada Indigenous Technology Apprentice - Fnim")).toBe(true);
+    expect(identityRestricted("Black Student Internship Program - Software")).toBe(true);
+    expect(identityRestricted("Women in Engineering Co-op")).toBe(true);
+    expect(identityRestricted("Software Engineering Intern")).toBe(false);
+    expect(identityRestricted("Data Scientist Intern - Blackberry QNX")).toBe(false);
   });
 });
 

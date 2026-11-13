@@ -110,6 +110,16 @@ project if you have to. Do not touch anything before \\begin{document}. Do not a
 Never use em dashes. Reply with just DONE.`;
 }
 
+export function fillPrompt(freeLines: number): string {
+  return `resume.tex compiles to one page but leaves about ${freeLines} empty lines at the bottom. Owen wants
+every resume to fill the whole page. Edit resume.tex in place: add back the most relevant project or
+entry from the base resume or experience.md that this version dropped (2 bullets, using the template's
+commands), or lengthen bullets that end well short of the line. Add about ${freeLines} lines, no more:
+it must still fit on ONE page. Only facts from the base resumes or experience.md. No \\vspace or other
+spacing commands, no font size commands, nothing before \\begin{document}. Never use em dashes.
+Reply with just DONE.`;
+}
+
 export function fixPrompt(error: string): string {
   return `resume.tex fails to compile with pdfLaTeX. The error is:
 

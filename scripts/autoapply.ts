@@ -19,7 +19,7 @@ import { PRIVATE_DIR, createJob, jobDir, readJob, writeJob, type Job, type StepN
 import { bodyProblems, compileTex, enforcePreamble, fontsFromLog, pageSpace, pdfToText } from "../lib/autoapply/latex";
 import { factProblems, letterNumberProblems, resumeSourceText } from "../lib/autoapply/facts";
 import { runClaude, usedHumanizer } from "../lib/autoapply/claude";
-import { coverLetterPrompt, letterFixPrompt, fixPrompt, humanizeRetryPrompt, problemsPrompt, reviewPrompt, revisePrompt, tailorPrompt, trimPrompt } from "../lib/autoapply/prompts";
+import { coverLetterPrompt, fillPrompt, letterFixPrompt, fixPrompt, humanizeRetryPrompt, problemsPrompt, reviewPrompt, revisePrompt, tailorPrompt, trimPrompt } from "../lib/autoapply/prompts";
 import { TARGETS, scoreResume, verdict, type AtsReport, type ResumeVerdict } from "../lib/autoapply/ats";
 import { coverLetterTex } from "../lib/autoapply/coverLetterTex";
 import { eligibilityWarnings } from "../lib/autoapply/eligibility";
@@ -126,6 +126,7 @@ type CheckCtx = { baseTex: string; factSources: { tex: string[]; experienceMd: s
  * new font sizes. Asks Claude to fix until resume.tex passes; throws after 4 tries.
  */
 async function passHardChecks({ baseTex, factSources, baseFonts }: CheckCtx) {
+  let askedFill = false;
   for (let attempt = 0; attempt < 4; attempt++) {
     const { tex, restored } = enforcePreamble(baseTex, read("resume.tex"));
     if (restored) {
@@ -146,6 +147,15 @@ async function passHardChecks({ baseTex, factSources, baseFonts }: CheckCtx) {
         );
       }
       if (problems.length) followUp = problemsPrompt(problems);
+      // Owen wants every resume to fill the page. Ask once: a fill that overshoots gets trimmed next pass.
+      else if (!askedFill) {
+        const free = (await pageSpace(path.join(dir, "resume.pdf")))?.freeLines ?? 0;
+        if (free >= 2) {
+          askedFill = true;
+          followUp = fillPrompt(free);
+          problems.push(`${free} empty lines at the bottom`);
+        }
+      }
     }
 
     if (!followUp) return;

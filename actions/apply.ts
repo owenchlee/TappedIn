@@ -191,7 +191,9 @@ export async function startPrefill(count = 10, submit = false, all = false): Pro
   assertEnabled();
   if (prefillRunning()) throw new Error("A batch is already being prefilled. Wait for it to finish.");
   const queue = await rankedQueue(listJobs());
-  const ids = queue.filter((j) => !readPrefill(j.id)).slice(0, Math.max(1, Math.min(all ? 300 : 20, count))).map((j) => j.id);
+  // "Top N" is the top N Owen sees on the list: a job with an old result (needs you, failed, ready) runs
+  // again; only one that is mid-run or already submitted is skipped.
+  const ids = queue.filter((j) => !["queued", "running", "submitted"].includes(readPrefill(j.id)?.state ?? "")).slice(0, Math.max(1, Math.min(all ? 300 : 20, count))).map((j) => j.id);
   if (!ids.length) throw new Error("Every job in the queue has already been prefilled.");
   rmSync(PREFILL_ERROR, { force: true });
   for (const id of ids) writePrefill(id, { state: "queued" });

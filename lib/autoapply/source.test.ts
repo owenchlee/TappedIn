@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isThirdParty, slugGuesses, titleMatch } from "./source";
+import { isThirdParty, slugGuesses, titleMatch, untrustedSite } from "./source";
 import { parseResult } from "./prefill";
 
 describe("isThirdParty", () => {
@@ -34,5 +34,23 @@ describe("parseResult", () => {
   });
   it("treats anything else as needing Owen", () => {
     expect(parseResult("I clicked around").state).toBe("needs_you");
+  });
+});
+
+describe("untrustedSite", () => {
+  it("trusts ATS hosts and employers' own domains", () => {
+    expect(untrustedSite("https://boards.greenhouse.io/kensington/jobs/1", "Kensington")).toBeNull();
+    expect(untrustedSite("https://aptiv.wd5.myworkdayjobs.com/x", "Aptiv")).toBeNull();
+    expect(untrustedSite("https://jobs.ea.com/en_US/careers/x", "Electronic Arts")).toBeNull();
+    expect(untrustedSite("https://careers.jdirving.com/x", "J.D. Irving")).toBeNull();
+    expect(untrustedSite("https://careers.atkinsrealis.com/x", "AtkinsRéalis")).toBeNull();
+    expect(untrustedSite("https://emplois.bnc.ca/x", "National Bank of Canada", ["bnc.ca"])).toBeNull();
+  });
+  it("holds lookalikes and unknown sites", () => {
+    expect(untrustedSite("http://jobs.aptiv.com/x", "Aptiv")).toMatch(/HTTPS/);
+    expect(untrustedSite("https://greenhouse.io.evil.com/x", "Kensington")).toMatch(/known job site/);
+    expect(untrustedSite("https://careers-hiring-now.com/x", "Tenstorrent")).toMatch(/known job site/);
+    expect(untrustedSite("https://xn--ptiv-xoa.com/x", "Aptiv")).toMatch(/punycode/);
+    expect(untrustedSite("https://185.2.3.4/apply", "Aptiv")).toMatch(/IP/);
   });
 });

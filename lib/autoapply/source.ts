@@ -19,6 +19,41 @@ export function isThirdParty(rawUrl: string): boolean {
   }
 }
 
+/** Real applicant-tracking systems: a posting on one of these is hosted by a known vendor, not a lookalike site. */
+const ATS_DOMAINS = [
+  "greenhouse.io", "lever.co", "ashbyhq.com", "myworkdayjobs.com", "myworkdaysite.com", "workday.com", "icims.com",
+  "smartrecruiters.com", "workable.com", "oraclecloud.com", "successfactors.com", "successfactors.eu", "taleo.net",
+  "jobvite.com", "rippling.com", "bamboohr.com", "recruitee.com", "teamtailor.com", "avature.net", "eightfold.ai",
+  "dayforcehcm.com", "ultipro.com", "ukg.com", "breezy.hr", "applytojob.com", "paylocity.com", "adp.com", "phenompeople.com",
+];
+const NAME_NOISE = new Set(["inc", "ltd", "llc", "corp", "the", "and", "of", "group", "technologies", "technology", "company", "canada", "partnership"]);
+
+/**
+ * Anti-phishing gate before the filler opens an apply link with Owen's details: null when the site is a known ATS,
+ * the employer's own domain (by name or initials), or in `trusted`; otherwise the reason to hold it for Owen.
+ */
+export function untrustedSite(rawUrl: string, company: string, trusted: string[] = []): string | null {
+  let host: string;
+  try {
+    const u = new URL(rawUrl);
+    if (u.protocol !== "https:") return "the link isn't HTTPS";
+    host = u.hostname.toLowerCase().replace(/\.$/, "");
+  } catch {
+    return "the link isn't a valid URL";
+  }
+  if (/^[\d.]+$|^\[|:/.test(host)) return "the link is a bare IP address";
+  if (host.split(".").some((p) => p.startsWith("xn--"))) return "the domain uses lookalike (punycode) characters";
+  const under = (d: string) => host === d || host.endsWith(`.${d}`);
+  if (ATS_DOMAINS.some(under) || trusted.some((d) => d && under(d.toLowerCase()))) return null;
+  const parts = host.split(".");
+  const label = (parts.length > 2 && parts.at(-2)!.length <= 3 && parts.at(-1)!.length === 2 ? parts.at(-3) : parts.at(-2)) ?? "";
+  const words = company.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().split(/[^a-z0-9]+/).filter((w) => w && !NAME_NOISE.has(w));
+  const initials = words.map((w) => w[0]).join("");
+  const squashed = words.join("");
+  const ok = words.some((w) => w.length >= 3 && label.includes(w)) || (label.length >= 2 && label === initials) || (label.length >= 4 && squashed.includes(label));
+  return ok ? null : `${host} isn't a known job site and doesn't look like ${company}'s own domain`;
+}
+
 /** likelyClosed: the job board dropped it and no public job board has it. Only a hint: Workday and company sites aren't searched. */
 export type SourceResult = { url: string; how: string } | { url: null; likelyClosed?: boolean; how: string };
 

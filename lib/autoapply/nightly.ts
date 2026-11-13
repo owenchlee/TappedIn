@@ -6,9 +6,10 @@ import { createJob, jobDir, listJobs } from "./job";
 import { getJobPrefs } from "@/lib/fit/store";
 import { termsInText } from "@/lib/fit/requirements";
 import { usVisaOk } from "./sponsors";
-import { clashesWithSchool, inTargetTerm, isQueued, longInPerson, mentionsCanada, realismScore, schoolRegion, spreadPicks, unrealisticTitle } from "./queue";
+import { clashesWithSchool, identityRestricted, inTargetTerm, isQueued, longInPerson, mentionsCanada, realismScore, schoolRegion, spreadPicks, unrealisticTitle } from "./queue";
 import { roiScore } from "./roi";
-import { findRealSource, isThirdParty } from "./source";
+import { checkPosting, findRealSource, isThirdParty } from "./source";
+import { offTermTitle } from "./formfill";
 
 // The app side of the nightly batch (scripts/nightly.ts drives it through /api/cron/nightly, so the
 // one-connection local database is only ever used by the app). Picks recent jobs a first-year in
@@ -67,7 +68,7 @@ export async function pickNightly(opts: { target: number; minScore: number; maxA
 
   const now = new Date();
   const ranked = rows
-    .filter((r) => !taken.has(r.id) && !takenTitles.has(key(r.company, r.role)) && !unrealisticTitle(r.role) && !longInPerson(schoolRegion(r.region, r.location), r.role) && !clashesWithSchool(schoolRegion(r.region, r.location), r.role, r.terms, targetTerms) && (schoolRegion(r.region, r.location) === "remote" || inTargetTerm(r.terms, r.role, targetTerms)))
+    .filter((r) => !taken.has(r.id) && !takenTitles.has(key(r.company, r.role)) && !unrealisticTitle(r.role) && !identityRestricted(r.role) && !longInPerson(schoolRegion(r.region, r.location), r.role) && !clashesWithSchool(schoolRegion(r.region, r.location), r.role, r.terms, targetTerms) && (schoolRegion(r.region, r.location) === "remote" || inTargetTerm(r.terms, r.role, targetTerms)))
     // Scored with the same posting date as the queue page (rankedQueue.ts). A U.S. job is scored as
     // sponsoring: the text check below drops the ones that don't, and most that do (usVisaOk) carry
     // no "sponsors" flag, so they'd lose points for a visa they don't need.
@@ -99,6 +100,10 @@ export async function pickNightly(opts: { target: number; minScore: number; maxA
         // any Claude time goes into tailoring for it: the queue won't show it anyway (isQueued).
         const src = isThirdParty(r.url) ? await findRealSource(r) : null;
         if (src?.url === null) continue;
+        // The description may never name the term while the title, link or form does (PlayStation's form:
+        // "What number work term will Winter 2027 be for you?", 2026-11-06). One fetch beats a wasted tailor.
+        if (offTermTitle(`${r.role} ${r.url} ${src?.url ?? ""}`)) continue;
+        if (!textTerms.length && (await checkPosting(src?.url ?? r.url)).skip) continue;
         eligible.push(src ? { ...r, applyUrl: src.url ?? undefined, applyUrlNote: src.how } : r);
       }
     }

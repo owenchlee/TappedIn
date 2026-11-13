@@ -67,8 +67,16 @@ export function ApplyQueue({
   const [processing, setProcessing] = useState(prefillRunning);
   const [runIds, setRunIds] = useState<string[]>([]);
   const pf = job ? prefill[job.id] : null;
-  const toProcess = queue.filter((j) => !prefill[j.id]).length;
+  const toProcess = queue.filter((j) => !["queued", "running", "submitted"].includes(prefill[j.id]?.state ?? "")).length;
   const toFinish = queue.filter((j) => prefill[j.id]?.state === "needs_you").length;
+  // Progress covers only the current run, not results left over from earlier ones. A run started from this
+  // page knows its jobs; otherwise (page opened mid-run) it's the jobs still going plus those started since.
+  const active = (p: PrefillView | null | undefined) => !!p && ["queued", "running"].includes(p.state);
+  const runStart = Object.values(prefill).filter(active).map((p) => p?.startedAt).filter(Boolean).sort()[0];
+  const currentRun = runIds.length
+    ? runIds.map((id) => prefill[id])
+    : Object.values(prefill).filter((p) => active(p) || (!!runStart && !!p?.startedAt && p.startedAt >= runStart));
+  const runDone = currentRun.filter((p) => p && !active(p)).length;
 
   // Jobs submitted while this page was closed get logged as applied (prefillStatus does it) and leave the queue.
   useEffect(() => {
@@ -286,8 +294,7 @@ export function ApplyQueue({
               <>
                 <p className="font-medium text-text">Filling applications in Chrome</p>
                 <p className="text-muted">
-                  {Object.values(prefill).filter((p) => p && !["queued", "running"].includes(p.state)).length} done of{" "}
-                  {Object.values(prefill).filter(Boolean).length}. You&apos;ll get a notification when they all are. {submitMode ? "Each one is submitted once its checks pass." : "Nothing gets submitted."}
+                  {runDone} done of {currentRun.length}. You&apos;ll get a notification when they all are. {submitMode ? "Each one is submitted once its checks pass." : "Nothing gets submitted."}
                 </p>
               </>
             ) : (

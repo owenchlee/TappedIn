@@ -93,6 +93,14 @@ export function longInPerson(region: string | null, title: string, text = ""): b
 }
 
 /**
+ * A program open only to a group Owen isn't in, going by its title: Accenture's "Canada Indigenous (FNIM)
+ * Technology Apprenticeship" reached the queue on 2026-11-05.
+ */
+export function identityRestricted(title: string): boolean {
+  return /\b(indigenous|fnim|first nations?|m[ée]tis|inuit|aboriginal|black (students?|youth|talent|professionals?|scholars?|internship)|women(?:'s)? (in|internship|program|scholars?|engineers?)|for women|hbcu)\b/i.test(title);
+}
+
+/**
  * An in-person co-op that touches a term Owen is in school for (winter, fall, or a co-op spanning
  * summer into either). Remote ones are fine: he can work around classes. Internships that list several
  * terms as options are left alone; a co-op listing several is a multi-term placement.
