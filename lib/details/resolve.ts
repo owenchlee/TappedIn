@@ -11,6 +11,10 @@ export type DetailTarget =
   | { kind: "workday"; api: string }
   | { kind: "workable"; api: string }
   | { kind: "oracle"; api: string }
+  | { kind: "bamboohr"; api: string }
+  /** UltiPro / UKG Pro: the page is drawn by JavaScript, but it carries the posting as JSON. */
+  | { kind: "ultipro"; url: string }
+  | { kind: "adp"; api: string }
   | { kind: "html"; url: string };
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -111,6 +115,28 @@ export function resolveDetailTarget(rawUrl: string): DetailTarget | null {
       return {
         kind: "oracle",
         api: `https://${host}/hcmRestApi/resources/latest/recruitingCEJobRequisitionDetails?expand=all&onlyData=true&finder=${encodeURIComponent(finder)}`,
+      };
+    }
+  }
+
+  // BambooHR: <company>.bamboohr.com/careers/<id>. The page is drawn by JavaScript; /detail is its JSON.
+  if (/\.bamboohr\.com$/.test(host) && parts[0] === "careers" && /^\d+$/.test(parts[1] ?? "")) {
+    return { kind: "bamboohr", api: `https://${host}/careers/${parts[1]}/detail` };
+  }
+
+  // UltiPro / UKG Pro: recruiting[2].ultipro.com|.ca or <co>.rec.pro.ukg.net/<tenant>/JobBoard/<board>/OpportunityDetail?opportunityId=<id>
+  if ((/(^|\.)ultipro\.(com|ca)$/.test(host) || /\.rec\.pro\.ukg\.net$/.test(host)) && parts.includes("OpportunityDetail") && url.searchParams.get("opportunityId")) {
+    return { kind: "ultipro", url: rawUrl };
+  }
+
+  // ADP Workforce Now: workforcenow.adp.com/...?cid=<client>&jobId=<id>, read from its public requisition API.
+  if (host === "workforcenow.adp.com") {
+    const cid = url.searchParams.get("cid");
+    const jobId = url.searchParams.get("jobId");
+    if (cid && jobId) {
+      return {
+        kind: "adp",
+        api: `https://workforcenow.adp.com/mascsr/default/careercenter/public/events/staffing/v1/job-requisitions/${encodeURIComponent(jobId)}?cid=${encodeURIComponent(cid)}&lang=en_US`,
       };
     }
   }

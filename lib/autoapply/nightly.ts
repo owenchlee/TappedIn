@@ -63,6 +63,8 @@ export async function pickNightly(opts: { target: number; minScore: number; maxA
       ],
     },
     select: { id: true, company: true, role: true, url: true, region: true, location: true, terms: true, fitScore: true, fitReasons: true, flags: true, postedAt: true, firstSeenAt: true, deadline: true },
+    // Newest first: over 1,000 rows qualify, and an unordered cut dropped fresh postings at random.
+    orderBy: { firstSeenAt: "desc" },
     take: 1000,
   });
 

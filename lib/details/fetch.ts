@@ -26,14 +26,25 @@ function userAgent(): string {
   return process.env.FETCH_USER_AGENT ?? "TappedIn/1.0 (personal job tracker)";
 }
 
+// Workday's shared wdN hosts and link shorteners answer a busy night with 429s; a short wait and
+// retry gets most of them instead of leaving the posting unread for days.
+const RETRY_WAITS_MS = [5_000, 15_000];
+
 async function request(url: string, accept: string): Promise<Response> {
-  const res = await fetch(url, {
-    headers: { "User-Agent": userAgent(), Accept: accept, "Accept-Language": "en-US,en;q=0.9" },
-    signal: AbortSignal.timeout(TIMEOUT_MS),
-    redirect: "follow",
-  });
-  if (!res.ok) throw new HttpError(res.status, url);
-  return res;
+  for (let attempt = 0; ; attempt++) {
+    const res = await fetch(url, {
+      headers: { "User-Agent": userAgent(), Accept: accept, "Accept-Language": "en-US,en;q=0.9" },
+      signal: AbortSignal.timeout(TIMEOUT_MS),
+      redirect: "follow",
+    });
+    if (res.ok) return res;
+    if ((res.status === 429 || res.status === 503) && attempt < RETRY_WAITS_MS.length) {
+      const after = Number(res.headers.get("retry-after"));
+      await new Promise((r) => setTimeout(r, after > 0 ? Math.min(after * 1000, 30_000) : RETRY_WAITS_MS[attempt]));
+      continue;
+    }
+    throw new HttpError(res.status, url);
+  }
 }
 
 const getJson = async <T>(url: string) => (await (await request(url, "application/json")).json()) as T;
@@ -134,6 +145,21 @@ export function extractFromHtml(html: string, finalUrl: string): DetailResult {
   return { status: "ok", text };
 }
 
+/** UltiPro / UKG pages pass the posting to `new US.Opportunity.CandidateOpportunityDetail({...});` on one line. */
+export function extractUltipro(html: string): DetailResult {
+  const marker = "CandidateOpportunityDetail(";
+  const at = html.indexOf(marker);
+  if (at < 0) return { status: "unsupported", reason: "UltiPro page has no posting data" };
+  const line = html.slice(at + marker.length).split("\n", 1)[0].replace(/\);?\s*$/, "");
+  try {
+    const d = JSON.parse(line) as { Description?: string; OpportunityIsClosed?: boolean };
+    if (d.OpportunityIsClosed) return { status: "gone", reason: "UltiPro says the opportunity is closed" };
+    return { status: "ok", text: htmlToText(d.Description ?? "") };
+  } catch {
+    return { status: "unsupported", reason: "UltiPro posting data didn't parse" };
+  }
+}
+
 async function fetchTarget(target: DetailTarget, cache: DetailCache): Promise<DetailResult> {
   switch (target.kind) {
     case "greenhouse": {
@@ -185,8 +211,25 @@ async function fetchTarget(target: DetailTarget, cache: DetailCache): Promise<De
       const parts = [req.ExternalDescriptionStr, req.ExternalResponsibilitiesStr, req.ExternalQualificationsStr].filter((h): h is string => Boolean(h));
       return { status: "ok", text: tidy(parts.map(htmlToText).join("\n\n")) };
     }
+    case "bamboohr": {
+      const d = await getJson<{ result?: { jobOpening?: { jobOpeningStatus?: string; description?: string } } }>(target.api);
+      const job = d.result?.jobOpening;
+      if (!job) return { status: "gone", reason: "BambooHR has no posting with this id" };
+      if (job.jobOpeningStatus && job.jobOpeningStatus !== "Open") return { status: "gone", reason: `BambooHR says the job is ${job.jobOpeningStatus}` };
+      return { status: "ok", text: htmlToText(job.description ?? "") };
+    }
+    case "ultipro":
+      return extractUltipro(await (await request(target.url, "text/html,application/xhtml+xml")).text());
+    case "adp": {
+      const d = await getJson<{ requisitionDescription?: string }>(target.api);
+      return { status: "ok", text: htmlToText(d.requisitionDescription ?? "") };
+    }
     case "html": {
       const res = await request(target.url, "text/html,application/xhtml+xml");
+      // A link shortener (go.vansh.nyc) lands on an ATS page drawn by JavaScript: read it through that
+      // ATS's own reader instead. The landing target is never "html", so this can't loop.
+      const landed = res.url && res.url !== target.url ? resolveDetailTarget(res.url) : null;
+      if (landed && landed.kind !== "html") return fetchTarget(landed, cache);
       return extractFromHtml(await res.text(), res.url || target.url);
     }
   }

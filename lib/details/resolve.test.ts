@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { resolveDetailTarget } from "@/lib/details/resolve";
-import { extractFromHtml, htmlToText } from "@/lib/details/fetch";
+import { extractFromHtml, extractUltipro, htmlToText } from "@/lib/details/fetch";
 
 // Real links from the SimplifyJobs / Canadian lists.
 describe("resolveDetailTarget", () => {
@@ -95,5 +95,32 @@ describe("extractFromHtml", () => {
   it("calls a JavaScript-only shell unsupported, not gone", () => {
     const r = extractFromHtml('<html><body><div id="root"></div><script>app()</script></body></html>', "https://example.com/job/1");
     expect(r.status).toBe("unsupported");
+  });
+});
+
+// Real links from the feed that used to come back "unsupported" (2026-11-23).
+describe("JavaScript-drawn ATS pages", () => {
+  it("maps BambooHR, UltiPro/UKG and ADP links to their posting data", () => {
+    expect(resolveDetailTarget("https://euna.bamboohr.com/careers/822/")).toEqual({ kind: "bamboohr", api: "https://euna.bamboohr.com/careers/822/detail" });
+    for (const u of [
+      "https://recruiting2.ultipro.com/INF1006CSCSV/JobBoard/cfbf4143-cfd9-45da-b8f8-e9d4ef4379a5/OpportunityDetail?opportunityId=a2ce0cf6-5514-4817-976f-974dcc0ca215",
+      "https://recruiting.ultipro.ca/MAC5000MCDW/JobBoard/664818ff-3594-4bec-9f30-3394e59e19f3/OpportunityDetail?opportunityId=b5aef546-676b-4f7a-8c20-acfa8f25069f",
+      "https://btcpa.rec.pro.ukg.net/BEN1022BTLL/JobBoard/702a70c1-c1f7-4971-8626-bb99571a35a2/OpportunityDetail?opportunityId=4d519358-fb57-46be-8018-838c26e1bf4a",
+    ]) {
+      expect(resolveDetailTarget(u)).toEqual({ kind: "ultipro", url: u });
+    }
+    expect(resolveDetailTarget("https://workforcenow.adp.com/job?cid=93fdfc70-37a2-4cde-ba86-0da4925db4c8&jobId=9200936414429_1")).toEqual({
+      kind: "adp",
+      api: "https://workforcenow.adp.com/mascsr/default/careercenter/public/events/staffing/v1/job-requisitions/9200936414429_1?cid=93fdfc70-37a2-4cde-ba86-0da4925db4c8&lang=en_US",
+    });
+    expect(resolveDetailTarget("https://go.vansh.nyc/1E6")).toEqual({ kind: "html", url: "https://go.vansh.nyc/1E6" });
+  });
+
+  it("reads the posting JSON an UltiPro page passes to its script", () => {
+    const page = (d: object) => `<script>\n  var opportunity = new US.Opportunity.CandidateOpportunityDetail(${JSON.stringify(d)});\n</script>`;
+    const r = extractUltipro(page({ Title: "Data Quality Intern", Description: "<p>You will check data.</p><ul><li>SQL</li></ul>", OpportunityIsClosed: false }));
+    expect(r).toEqual({ status: "ok", text: "You will check data.\n• SQL" });
+    expect(extractUltipro(page({ Description: "x", OpportunityIsClosed: true })).status).toBe("gone");
+    expect(extractUltipro("<div id=app></div>").status).toBe("unsupported");
   });
 });

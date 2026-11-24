@@ -5,7 +5,8 @@ import { bigCompany, unrealisticTitle } from "./queue";
 // turns into an interview. Pure, so the queue page and the tests agree. The weights follow what
 // hiring data says moves those odds:
 //  - Timing. Recruiters screen in arrival order and stop once they have enough: TalentWorks found
-//    interview odds several times higher in a posting's first ~4 days, falling ~28% a day after.
+//    interview odds several times higher in a posting's first ~4 days. Owen chose a gentler -8% a day
+//    after that (2026-11-23): co-op postings stay open for weeks and -28% left almost nothing to tailor.
 //  - Competition. Big-tech internships draw thousands of applicants (Handshake: 247 per tech
 //    internship on average, and far more at household names), with acceptance well under 5%.
 //  - Who it's for. A posting open to 1st/2nd years (or a co-op) is the only kind where a first-year
@@ -38,11 +39,11 @@ export function roiScore(job: RoiInput, now = new Date()): Roi {
   const flags = job.flags ?? [];
   const parts: RoiPart[] = [];
 
-  // Timing (30): full marks for the first 4 days, then -28% a day. With no posting date, it's at
+  // Timing (30): full marks for the first 4 days, then -8% a day. With no posting date, it's at
   // least as old as the night it was tailored, and probably a few days older.
   const since = job.postedAt ?? job.foundAt;
   const age = since ? Math.max(0, (now.getTime() - since.getTime()) / DAY) + (job.postedAt ? 0 : 3) : null;
-  const fresh = age == null ? 12 : age <= 4 ? 30 : 30 * 0.72 ** (age - 4);
+  const fresh = age == null ? 12 : age <= 4 ? 30 : 30 * 0.92 ** (age - 4);
   const ageLabel = age == null ? "Posting date unknown" : !job.postedAt ? `Found ${Math.floor(age - 3)}d ago` : age < 1 ? "Posted today" : `Posted ${Math.floor(age)}d ago`;
   parts.push({ label: ageLabel, points: fresh, max: 30 });
 

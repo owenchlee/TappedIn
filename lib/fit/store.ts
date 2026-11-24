@@ -104,9 +104,11 @@ export type DetailsSummary = { attempted: number; ok: number; gone: number; unsu
 
 type Candidate = { id: string; url: string; saved: { id: string } | null; disappearedAt: Date | null };
 
+/** The rate-limit bucket for a URL. Workday tenants share wdN servers that throttle together. */
 function hostOf(url: string): string {
   try {
-    return new URL(url).hostname;
+    const host = new URL(url).hostname;
+    return /\.(wd\d+\.myworkdayjobs\.com)$/.exec(host)?.[1] ?? host;
   } catch {
     return "";
   }
@@ -115,7 +117,8 @@ function hostOf(url: string): string {
 /**
  * Jobs whose posting text is worth (re)reading, best matches first:
  *  1. never read;
- *  2. a failed read more than 2 days ago;
+ *  2. a failed read from an earlier night (20h+ ago: the batch runs nightly, and a week-old posting
+ *     has already lost much of its ROI);
  *  3. a good match read more than a week ago, to catch postings that were taken down.
  */
 async function detailCandidates(limit: number): Promise<Candidate[]> {
@@ -126,7 +129,7 @@ async function detailCandidates(limit: number): Promise<Candidate[]> {
   const fresh = await prisma.coopPosting.findMany({ where: { ...open, detailsAt: null }, select, orderBy: order, take: limit });
   if (fresh.length >= limit) return fresh;
   const retry = await prisma.coopPosting.findMany({
-    where: { ...open, detailsStatus: "error", detailsAt: { lt: new Date(now - 2 * DAY) } },
+    where: { ...open, detailsStatus: "error", detailsAt: { lt: new Date(now - 20 * 3_600_000) } },
     select,
     orderBy: order,
     take: limit - fresh.length,
